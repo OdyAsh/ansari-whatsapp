@@ -12,7 +12,7 @@ example_projects/
 lib/
 logs/
 share/
-src/ansari_backend.egg-info/*
+src/ansari_whatsapp.egg-info/*
 tmp/
 dist/
 
@@ -23,3 +23,9 @@ dist/
 *.pyc
 pyvenv.cfg
 zrok.exe
+tests/combined_test_results.json
+tests/detailed_test_results_api_endpoints.json
+tests/detailed_test_results_integration.json
+tests/test_results_api_endpoints.log
+tests/test_results_integration.log
+tests/test_runner.log

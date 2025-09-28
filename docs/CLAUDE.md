@@ -10,11 +10,31 @@ This is `ansari-whatsapp`, a Python FastAPI microservice that handles WhatsApp B
 
 ### Setup and Installation
 - **Initial setup**: `./setup.sh` (Linux/Mac) or `setup.bat` (Windows) - Creates virtual environment, installs dependencies, and sets up .env file
-- **Manual setup**: `python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt`
+- **Manual setup**: `python -m venv .venv && source .venv/bin/activate && uv sync`
 
 ### Running the Application
-- **Development mode**: `python -m src.ansari_whatsapp.app.main` - Starts server on port 8001 with auto-reload
+- **Development mode**:
+  1. Use ansari-whatsapp's OWN venv python: `D:\CS\projects\ansari\ansari-whatsapp\.venv\Scripts\python.exe src/ansari_whatsapp/app/main.py` - Starts server on port 8001 with auto-reload
+  - Alternative: `python -m src.ansari_whatsapp.app.main`
+
+  **IMPORTANT**: Use ansari-whatsapp's own .venv, NOT ansari-backend's .venv!
+
+  **Note**: Direct venv python path is used because `source .venv/Scripts/activate` may not properly activate the virtual environment in bash.
+
+  **Testing changes**: ansari-whatsapp boots up quickly, so auto-reload works reliably. You can test immediately after making changes.
 - **Docker**: `docker build -t ansari-whatsapp . && docker run -p 8001:8001 --env-file .env ansari-whatsapp`
+- **WhatsApp Webhook Proxy** (for local testing with Meta):
+  1. In separate terminal, activate environment and cd to ansari-whatsapp root
+  2. Run: `zrok reserve public localhost:8001 -n ZROK_SHARE_TOKEN` (using ZROK_SHARE_TOKEN from .env)
+  3. This creates a public URL that Meta can reach to send webhook requests to your local server
+
+### Package Management
+- **Install dependencies**: `uv sync` - Installs all dependencies from pyproject.toml and uv.lock
+- **Add new package**: `uv add <package>` - Adds package to dependencies and updates lock file
+- **Add development dependency**: `uv add --dev <package>` - Adds package to dev dependencies
+- **Remove package**: `uv remove <package>` - Removes package from dependencies
+- **Create virtual environment**: `uv venv` - Creates .venv directory (if not exists)
+- **Update dependencies**: `uv lock` - Updates uv.lock file with latest compatible versions
 
 ### Code Quality
 - **Linting**: `ruff check .` - Uses Ruff with line length 127, targeting Python 3.10+

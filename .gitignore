@@ -22,10 +22,6 @@ dist/
 .history
 *.pyc
 pyvenv.cfg
+tests/*.log
+tests/*.json
 zrok.exe
-tests/combined_test_results.json
-tests/detailed_test_results_api_endpoints.json
-tests/detailed_test_results_integration.json
-tests/test_results_api_endpoints.log
-tests/test_results_integration.log
-tests/test_runner.log

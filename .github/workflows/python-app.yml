@@ -1,0 +1,67 @@
+# GitHub Actions workflow for ansari-whatsapp microservice
+# This workflow tests the WhatsApp integration functionality using pytest and TestClient
+
+name: Ansari WhatsApp CICD
+
+on:
+  # Trigger the workflow on push or pull request events
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+
+permissions:
+  contents: read
+
+jobs:
+  ansari-whatsapp-tests:
+    runs-on: ubuntu-latest
+
+    env:
+      # Set up environment variables required for testing
+      META_WEBHOOK_VERIFY_TOKEN: ${{ secrets.META_WEBHOOK_VERIFY_TOKEN }}
+      META_BUSINESS_PHONE_NUMBER_ID: ${{ secrets.META_BUSINESS_PHONE_NUMBER_ID }}
+      PYTHONPATH: src:.
+
+    # Use a Python 3.10 container
+    container: python:3.10
+
+    steps:
+
+    # Check out the repository code
+    - name: Check out repository code
+      uses: actions/checkout@v4
+
+    # Install the uv tool
+    - name: Install uv
+      run: |
+        pip install uv
+
+    # Install Python dependencies using uv
+    - name: Install dependencies
+      run: |
+        uv pip install --system pytest pytest-asyncio python-dotenv
+        if [ -f requirements.txt ]; then uv pip install --system -r requirements.txt; fi
+        # Install project dependencies
+        uv sync --no-dev
+
+    # Run WhatsApp service tests using pytest
+    - name: Test with pytest
+      run: |
+        # Run WhatsApp service tests (no external server dependencies)
+        # These test WhatsApp webhook endpoints using TestClient
+        pytest tests/test_whatsapp_service.py -v --tb=short
+
+        # Note: WhatsApp API endpoint tests are in ansari-backend repository
+        # They test backend API endpoints and use TestClient without external servers
+
+    # Optional: Upload test results as artifacts
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results
+        path: |
+          tests/detailed_test_results_whatsapp_service.json
+          tests/test_runner.log
+        retention-days: 30

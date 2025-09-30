@@ -65,7 +65,7 @@ class WhatsAppSettings(BaseSettings):
     DEPLOYMENT_TYPE: str = Field(
         ...,
         description="Deployment environment type",
-        pattern="^(local|staging|production)$",
+        pattern="^(local|staging|production|test)$",
     )
 
     # Server settings

@@ -12,7 +12,7 @@ https://www.perplexity.ai/search/explain-fastapi-s-backgroundta-rnpU7D19QpSxp2ZO
 """
 
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, Response, JSONResponse
 
 from ansari_whatsapp.presenters.whatsapp_presenter import WhatsAppPresenter, extract_relevant_whatsapp_message_details
 from ansari_whatsapp.utils.whatsapp_logger import get_logger
@@ -20,6 +20,60 @@ from ansari_whatsapp.utils.config import get_settings
 from ansari_whatsapp.utils.general_helpers import CORSMiddlewareWithLogging
 
 logger = get_logger(__name__)
+
+
+# Helper function for webhook responses
+def create_webhook_response(
+    success: bool = True,
+    message: str = "OK",
+    status_code: int = 200,
+    error_code: str | None = None,
+    details: dict | None = None
+) -> Response:
+    """
+    Create appropriate webhook response based on deployment environment.
+
+    In test environment: Returns proper HTTP status codes for testing
+    In production/staging/local: Always returns 200 for Meta compliance
+
+    Args:
+        success: Whether the operation was successful
+        message: Human-readable message
+        status_code: HTTP status code to use (only in test mode)
+        error_code: Machine-readable error code
+        details: Additional details to include in response
+
+    Returns:
+        Response: HTTP response appropriate for current environment
+    """
+    settings = get_settings()
+
+    # Create response body with structured information
+    response_body = {
+        "success": success,
+        "message": message,
+        "timestamp": int(__import__("time").time())
+    }
+
+    if error_code:
+        response_body["error_code"] = error_code
+
+    if details:
+        response_body["details"] = details
+
+    # In test environment: return proper HTTP status codes
+    if settings.DEPLOYMENT_TYPE == "test":
+        return JSONResponse(
+            content=response_body,
+            status_code=status_code if not success else 200
+        )
+
+    # In production environments: always return 200 for Meta compliance
+    # But still include structured response body for logging/debugging
+    return JSONResponse(
+        content=response_body,
+        status_code=200
+    )
 
 # TODO NOW: test , if no httpx.readtimeout occurs, then understand async def process_message(request: MessageProcessing)
 #   and check other TODO NOWs
@@ -165,18 +219,33 @@ async def main_webhook(request: Request, background_tasks: BackgroundTasks) -> R
         # Check if this webhook is intended for our WhatsApp business phone number
         if not is_target_business_number:
             logger.debug("Ignoring webhook not intended for our WhatsApp business number")
-            return Response(status_code=200)
+            return create_webhook_response(
+                success=False,
+                message="Webhook not intended for our WhatsApp business number",
+                status_code=422,
+                error_code="WRONG_PHONE_NUMBER"
+            )
 
         # Terminate if the incoming message is a status message (e.g., "delivered")
         if is_status:
             logger.debug("Ignoring status update message (e.g., delivered, read)")
             # This is a status message, not a user message, so doesn't need processing
-            return Response(status_code=200)
+            return create_webhook_response(
+                success=True,
+                message="Status message processed (ignored)",
+                error_code="STATUS_MESSAGE"
+            )
 
         logger.debug(f"Incoming whatsapp webhook message from {from_whatsapp_number}")
     except Exception as e:
         logger.error(f"Error extracting message details: {e}")
-        return Response(status_code=200)
+        return create_webhook_response(
+            success=False,
+            message="Error processing webhook payload",
+            status_code=400,
+            error_code="INVALID_PAYLOAD",
+            details={"error": str(e)}
+        )
 
     # Create a user-specific presenter instance for this request
     user_presenter = WhatsAppPresenter(
@@ -236,7 +305,12 @@ async def main_webhook(request: Request, background_tasks: BackgroundTasks) -> R
         background_tasks.add_task(
             user_presenter.send_whatsapp_message, "Sorry, we couldn't register you to our database. Please try again later."
         )
-        return Response(status_code=200)
+        return create_webhook_response(
+            success=False,
+            message="User registration failed",
+            status_code=500,
+            error_code="USER_REGISTRATION_FAILED"
+        )
 
     # Check if the incoming message is a location
     if incoming_msg_type == "location":
@@ -257,7 +331,10 @@ async def main_webhook(request: Request, background_tasks: BackgroundTasks) -> R
         user_presenter.handle_text_message,
     )
 
-    return Response(status_code=200)
+    return create_webhook_response(
+        success=True,
+        message="Message processed successfully"
+    )
 
 
 if __name__ == "__main__":

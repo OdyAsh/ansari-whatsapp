@@ -6,15 +6,9 @@ the backend test patterns (pytest + TestClient + fixtures).
 """
 
 import json
-import os
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 from datetime import datetime
-
-from dotenv import load_dotenv
-
-# Load environment variables from .env file
-load_dotenv()
 
 def mask_sensitive_data(data: Any) -> Any:
     """
@@ -54,34 +48,6 @@ def mask_sensitive_data(data: Any) -> Any:
 
     else:
         return data
-
-
-def get_env_var(key: str, default: Optional[str] = None, required: bool = True) -> str:
-    """
-    Get environment variable with proper error handling.
-
-    Environment variables are loaded from .env file via load_dotenv() at module import time.
-
-    Args:
-        key: Environment variable key
-        default: Default value if not found
-        required: Whether the variable is required
-
-    Returns:
-        Environment variable value
-
-    Raises:
-        ValueError: If required variable is not found
-    """
-    value = os.getenv(key, default)
-
-    if required and not value:
-        raise ValueError(
-            f"Required environment variable '{key}' is not set. "
-            f"Please ensure your .env file contains: {key}=your_value"
-        )
-
-    return value
 
 
 def secure_log_result(test_name: str, success: bool, message: str, response_data: Any = None) -> Dict[str, Any]:

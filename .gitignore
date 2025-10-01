@@ -1,4 +1,5 @@
 # Folders
+.claude/
 .conda/
 .venv/
 .vscode/

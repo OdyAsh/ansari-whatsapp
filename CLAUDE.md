@@ -28,6 +28,9 @@ This is the `ansari-whatsapp` microservice that handles WhatsApp webhook request
 - **Pattern:** Follow backend test patterns (pytest + TestClient + fixtures)
 - **Installation:** `uv add pytest`
 - **Run tests:** `pytest tests/ -v`
+- **Logging Modes:**
+  - `pytest tests/ -v -s` → all logs including FastAPI
+  - `pytest tests/ -v -s --log-mode=test-only` → test-only logs (filters out FastAPI/TestClient noise)
 
 ### Security Requirements
 - **Environment Variables:** Load sensitive data from `.env` file using `get_env_var()`

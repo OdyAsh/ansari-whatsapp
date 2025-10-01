@@ -23,8 +23,8 @@ from fastapi.testclient import TestClient
 
 from ansari_whatsapp.app.main import app
 from ansari_whatsapp.utils.whatsapp_logger import get_logger
+from ansari_whatsapp.utils.config import get_settings
 from .test_utils import (
-    get_env_var,
     secure_log_result,
     format_payload_for_logging,
     format_params_for_logging
@@ -33,12 +33,13 @@ from .test_utils import (
 # Initialize logger
 logger = get_logger(__name__)
 
-# Load sensitive data from environment variables
-TEST_VERIFY_TOKEN = get_env_var("META_WEBHOOK_VERIFY_TOKEN", required=True)
-TEST_PHONE_NUMBER_ID = get_env_var("META_BUSINESS_PHONE_NUMBER_ID", required=True)
-
 # Configuration (non-sensitive)
 TEST_PHONE_NUM = "9876543210"  # Test phone number for webhook messages
+
+
+@pytest.fixture(scope="module")
+def settings():
+    return get_settings()
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -49,7 +50,6 @@ def test_environment():
     os.environ["DEPLOYMENT_TYPE"] = "test"
 
     # Clear the settings cache to ensure the new DEPLOYMENT_TYPE is used
-    from ansari_whatsapp.utils.config import get_settings
     get_settings.cache_clear()
 
     yield
@@ -98,13 +98,13 @@ def test_whatsapp_health():
 
 
 @pytest.mark.integration
-def test_webhook_verification():
+def test_webhook_verification(settings):
     """Test WhatsApp webhook verification endpoint using TestClient."""
     test_name = "Webhook Verification"
 
     params = {
         "hub.mode": "subscribe",
-        "hub.verify_token": TEST_VERIFY_TOKEN,
+        "hub.verify_token": settings.META_WEBHOOK_VERIFY_TOKEN.get_secret_value(),
         "hub.challenge": "test_challenge_12345"
     }
 
@@ -124,7 +124,7 @@ def test_webhook_verification():
 
 
 @pytest.mark.integration
-def test_webhook_message_basic():
+def test_webhook_message_basic(settings):
     """Test basic WhatsApp webhook message processing using TestClient."""
     test_name = "Basic Webhook Message"
 
@@ -137,7 +137,7 @@ def test_webhook_message_basic():
                     {
                         "value": {
                             "metadata": {
-                                "phone_number_id": TEST_PHONE_NUMBER_ID,
+                                "phone_number_id": settings.META_BUSINESS_PHONE_NUMBER_ID.get_secret_value(),
                                 "display_phone_number": "+1234567890"
                             },
                             "messages": [

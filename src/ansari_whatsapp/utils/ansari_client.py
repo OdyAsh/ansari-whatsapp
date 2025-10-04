@@ -3,8 +3,17 @@
 
 import httpx
 
-from ansari_whatsapp.utils.whatsapp_logger import get_logger, make_error_handler
+from ansari_whatsapp.utils.whatsapp_logger import get_logger
 from ansari_whatsapp.utils.config import get_settings
+from ansari_whatsapp.utils.exceptions import (
+    UserRegistrationError,
+    UserExistsCheckError,
+    UserLocationUpdateError,
+    ThreadCreationError,
+    ThreadHistoryError,
+    ThreadInfoError,
+    MessageProcessingError,
+)
 
 logger = get_logger(__name__)
 
@@ -17,7 +26,6 @@ class AnsariClient:
         self.settings = get_settings()
         self.base_url = self.settings.BACKEND_SERVER_URL
 
-    @logger.catch(onerror=make_error_handler("Error registering user", {"status": "failure"}))
     async def register_user(self, phone_num: str, preferred_language: str) -> dict:
         """
         Register a new WhatsApp user with the Ansari backend.
@@ -28,19 +36,28 @@ class AnsariClient:
 
         Returns:
             dict: The registration result.
-        """
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.base_url}/api/v2/whatsapp/users/register",
-                json={
-                    "phone_num": phone_num,
-                    "preferred_language": preferred_language,
-                },
-            )
-            response.raise_for_status()
-            return response.json()
 
-    @logger.catch(onerror=make_error_handler("Error checking if user exists", False))
+        Raises:
+            UserRegistrationError: If the registration fails.
+        """
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.base_url}/api/v2/whatsapp/users/register",
+                    json={
+                        "phone_num": phone_num,
+                        "preferred_language": preferred_language,
+                    },
+                )
+                response.raise_for_status()
+                return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error registering user {phone_num}: {e.response.status_code}")
+            raise UserRegistrationError(f"Failed to register user: HTTP {e.response.status_code}") from e
+        except httpx.RequestError as e:
+            logger.error(f"Network error registering user {phone_num}: {e}")
+            raise UserRegistrationError("Network error during registration") from e
+
     async def check_user_exists(self, phone_num: str) -> bool:
         """
         Check if a WhatsApp user exists in the Ansari backend.
@@ -50,16 +67,25 @@ class AnsariClient:
 
         Returns:
             bool: True if the user exists, False otherwise.
-        """
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{self.base_url}/api/v2/whatsapp/users/exists",
-                params={"phone_num": phone_num},
-            )
-            response.raise_for_status()
-            return response.json().get("exists", False)
 
-    @logger.catch(onerror=make_error_handler("Error updating user location", {"status": "failure"}))
+        Raises:
+            UserExistsCheckError: If the check fails.
+        """
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.base_url}/api/v2/whatsapp/users/exists",
+                    params={"phone_num": phone_num},
+                )
+                response.raise_for_status()
+                return response.json().get("exists", False)
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error checking if user exists {phone_num}: {e.response.status_code}")
+            raise UserExistsCheckError(f"Failed to check user existence: HTTP {e.response.status_code}") from e
+        except httpx.RequestError as e:
+            logger.error(f"Network error checking if user exists {phone_num}: {e}")
+            raise UserExistsCheckError("Network error during user existence check") from e
+
     async def update_user_location(self, phone_num: str, latitude: float, longitude: float) -> dict:
         """
         Update a WhatsApp user's location in the Ansari backend.
@@ -71,20 +97,29 @@ class AnsariClient:
 
         Returns:
             dict: The update result.
-        """
-        async with httpx.AsyncClient() as client:
-            response = await client.put(
-                f"{self.base_url}/api/v2/whatsapp/users/location",
-                json={
-                    "phone_num": phone_num,
-                    "latitude": latitude,
-                    "longitude": longitude,
-                },
-            )
-            response.raise_for_status()
-            return response.json()
 
-    @logger.catch(onerror=make_error_handler("Error creating thread", {"error": ""}))
+        Raises:
+            UserLocationUpdateError: If the update fails.
+        """
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.put(
+                    f"{self.base_url}/api/v2/whatsapp/users/location",
+                    json={
+                        "phone_num": phone_num,
+                        "latitude": latitude,
+                        "longitude": longitude,
+                    },
+                )
+                response.raise_for_status()
+                return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error updating user location {phone_num}: {e.response.status_code}")
+            raise UserLocationUpdateError(f"Failed to update user location: HTTP {e.response.status_code}") from e
+        except httpx.RequestError as e:
+            logger.error(f"Network error updating user location {phone_num}: {e}")
+            raise UserLocationUpdateError("Network error during location update") from e
+
     async def create_thread(self, phone_num: str, title: str) -> dict:
         """
         Create a new thread for a WhatsApp user in the Ansari backend.
@@ -95,16 +130,25 @@ class AnsariClient:
 
         Returns:
             dict: The creation result with thread_id.
-        """
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.base_url}/api/v2/whatsapp/threads",
-                json={"phone_num": phone_num, "title": title},
-            )
-            response.raise_for_status()
-            return response.json()
 
-    @logger.catch(onerror=make_error_handler("Error getting thread history", {"error": ""}))
+        Raises:
+            ThreadCreationError: If thread creation fails.
+        """
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.base_url}/api/v2/whatsapp/threads",
+                    json={"phone_num": phone_num, "title": title},
+                )
+                response.raise_for_status()
+                return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error creating thread for {phone_num}: {e.response.status_code}")
+            raise ThreadCreationError(f"Failed to create thread: HTTP {e.response.status_code}") from e
+        except httpx.RequestError as e:
+            logger.error(f"Network error creating thread for {phone_num}: {e}")
+            raise ThreadCreationError("Network error during thread creation") from e
+
     async def get_thread_history(self, phone_num: str, thread_id: str) -> dict:
         """
         Get the message history for a WhatsApp user's thread from the Ansari backend.
@@ -115,16 +159,25 @@ class AnsariClient:
 
         Returns:
             dict: The thread history.
-        """
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{self.base_url}/api/v2/whatsapp/threads/{thread_id}/history",
-                params={"phone_num": phone_num},
-            )
-            response.raise_for_status()
-            return response.json()
 
-    @logger.catch(onerror=make_error_handler("Error getting last thread info", {"thread_id": None, "last_message_time": None}))
+        Raises:
+            ThreadHistoryError: If retrieving thread history fails.
+        """
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.base_url}/api/v2/whatsapp/threads/{thread_id}/history",
+                    params={"phone_num": phone_num},
+                )
+                response.raise_for_status()
+                return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error getting thread history for {phone_num}: {e.response.status_code}")
+            raise ThreadHistoryError(f"Failed to get thread history: HTTP {e.response.status_code}") from e
+        except httpx.RequestError as e:
+            logger.error(f"Network error getting thread history for {phone_num}: {e}")
+            raise ThreadHistoryError("Network error during thread history retrieval") from e
+
     async def get_last_thread_info(self, phone_num: str) -> dict:
         """
         Get information about the last active thread for a WhatsApp user.
@@ -134,20 +187,25 @@ class AnsariClient:
 
         Returns:
             dict: The thread info with thread_id and last_message_time.
-        """
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{self.base_url}/api/v2/whatsapp/threads/last",
-                params={"phone_num": phone_num},
-            )
-            response.raise_for_status()
-            return response.json()
 
-    @logger.catch(
-        onerror=make_error_handler(
-            "Error processing message", "An error occurred while processing your message. Please try again later."
-        )
-    )
+        Raises:
+            ThreadInfoError: If retrieving thread info fails.
+        """
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.base_url}/api/v2/whatsapp/threads/last",
+                    params={"phone_num": phone_num},
+                )
+                response.raise_for_status()
+                return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error getting last thread info for {phone_num}: {e.response.status_code}")
+            raise ThreadInfoError(f"Failed to get last thread info: HTTP {e.response.status_code}") from e
+        except httpx.RequestError as e:
+            logger.error(f"Network error getting last thread info for {phone_num}: {e}")
+            raise ThreadInfoError("Network error during thread info retrieval") from e
+
     async def process_message(self, phone_num: str, thread_id: str, message: str) -> str:
         """
         Process a message from a WhatsApp user with the Ansari backend.
@@ -160,33 +218,47 @@ class AnsariClient:
 
         Returns:
             str: The complete response message.
+
+        Raises:
+            MessageProcessingError: If message processing fails.
         """
-        async with httpx.AsyncClient() as client:
-            url = f"{self.base_url}/api/v2/whatsapp/messages/process"
-            data = {
-                "phone_num": phone_num,
-                "thread_id": thread_id,
-                "message": message,
-            }
+        try:
+            async with httpx.AsyncClient() as client:
+                url = f"{self.base_url}/api/v2/whatsapp/messages/process"
+                data = {
+                    "phone_num": phone_num,
+                    "thread_id": thread_id,
+                    "message": message,
+                }
 
-            # Use stream=True to receive the response as a stream
-            async with client.stream("POST", url, json=data, timeout=60.0) as response:
-                if response.status_code != 200:
-                    error_detail = await response.aread()
-                    logger.error(f"Error from backend API: {error_detail}")
-                    raise httpx.HTTPStatusError(
-                        f"Error processing message: {error_detail}", request=response.request, response=response
-                    )
+                # Use stream=True to receive the response as a stream
+                async with client.stream("POST", url, json=data, timeout=60.0) as response:
+                    if response.status_code != 200:
+                        error_detail = await response.aread()
+                        logger.error(f"Error from backend API: {error_detail}")
+                        raise MessageProcessingError(f"Backend returned HTTP {response.status_code}: {error_detail}")
 
-                # Accumulate the full response as we receive chunks
-                full_response = ""
-                async for chunk in response.aiter_text():
-                    # Each chunk is a token from the streaming response
-                    if chunk:
-                        full_response += chunk
+                    # Accumulate the full response as we receive chunks
+                    full_response = ""
+                    async for chunk in response.aiter_text():
+                        # Each chunk is a token from the streaming response
+                        if chunk:
+                            full_response += chunk
 
-                if not full_response:
-                    logger.error("Received empty response from backend")
-                    return ""
+                    if not full_response:
+                        logger.warning("Received empty response from backend")
+                        return ""
 
-                return full_response
+                    return full_response
+        except httpx.TimeoutException as e:
+            logger.error(f"Timeout processing message for {phone_num}: {e}")
+            raise MessageProcessingError("Request timed out while processing message") from e
+        except httpx.RequestError as e:
+            logger.error(f"Network error processing message for {phone_num}: {e}")
+            raise MessageProcessingError("Network error during message processing") from e
+        except MessageProcessingError:
+            # Re-raise our custom exception without wrapping
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error processing message for {phone_num}: {e}")
+            raise MessageProcessingError(f"Unexpected error: {str(e)}") from e

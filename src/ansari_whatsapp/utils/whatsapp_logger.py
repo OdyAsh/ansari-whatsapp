@@ -98,6 +98,22 @@ def get_logger(name: str):
             module_log_file,
             format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {file}:{line} [{function}()] | {message}",
             level=settings.LOGGING_LEVEL.upper(),
+            backtrace=False,
+            diagnose=False,
+            filter=log_filter,
+            rotation="10 MB",
+            catch=False,
+        )
+
+        # Make it log to `all_logs.log` as well
+        all_logs_file = os.path.join(log_dir, "all_logs.log")
+        module_logger.add(
+            all_logs_file,
+            format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {file}:{line} [{function}()] | {message}",
+            level=settings.LOGGING_LEVEL.upper(),
+            enqueue=True,
+            backtrace=False,
+            diagnose=False,
             filter=log_filter,
             rotation="10 MB",
             catch=False,
@@ -107,26 +123,24 @@ def get_logger(name: str):
     return module_logger
 
 # Error handler factory that creates context-specific error handlers
-def make_error_handler(context: str, default_return: dict | Any = None) -> Callable:
-    """Create a context-specific error handler.
+# NOTE: This function is deprecated in favor of explicit try-except blocks with custom exceptions.
+# It remains here for backward compatibility with any remaining @logger.catch decorators.
+def make_error_handler(context: str) -> Callable:
+    """Create a context-specific error handler (DEPRECATED).
+
+    This function is deprecated. Use explicit try-except blocks with custom exceptions instead.
 
     Args:
         context (str): Description of the operation that failed (e.g., "Error registering user")
-        default_return (dict | Any): Default value to return on error
 
     Returns:
         callable: An error handler function that can be used with logger.catch
     """
 
     def error_handler(exception):
-        logger.exception(f"{context}: {exception}")
-        # If default_return is a dict, add the error message to it
-        if isinstance(default_return, dict) and "error" not in default_return:
-            result = default_return.copy()
-            result["error"] = str(exception)
-            return result
-        # Otherwise, just return the default value
-        else:
-            return default_return
+        exception_msg = str(exception)
+        # NOTE: Loguru's exception method automatically includes the stack trace after the message
+        logger.exception(f"{context}: {exception_msg}")
+        return
 
     return error_handler

@@ -3,10 +3,8 @@
 
 import httpx
 
-from ansari_whatsapp.utils.whatsapp_logger import get_logger, make_error_handler
+from ansari_whatsapp.utils.whatsapp_logger import logger, make_error_handler
 from ansari_whatsapp.utils.config import get_settings
-
-logger = get_logger(__name__)
 
 
 class AnsariClient:

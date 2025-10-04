@@ -4,9 +4,7 @@
 from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from ansari_whatsapp.utils.whatsapp_logger import get_logger
-
-logger = get_logger(__name__)
+from ansari_whatsapp.utils.whatsapp_logger import logger
 
 
 # Custom CORS middleware to log errors that occur in the middleware layer (if any)

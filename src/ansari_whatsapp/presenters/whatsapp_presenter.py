@@ -8,15 +8,13 @@ from datetime import datetime, timezone
 
 import httpx
 
-from ansari_whatsapp.utils.whatsapp_logger import get_logger, make_error_handler
+from ansari_whatsapp.utils.whatsapp_logger import logger, make_error_handler
 from ansari_whatsapp.utils.config import get_settings
 from ansari_whatsapp.utils.ansari_client import AnsariClient
 from ansari_whatsapp.utils.language_utils import (
     get_language_direction_from_text,
     get_language_from_text,
 )
-
-logger = get_logger(__name__)
 
 # Global configuration variables
 settings = get_settings()

@@ -15,11 +15,9 @@ from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.responses import HTMLResponse, Response, JSONResponse
 
 from ansari_whatsapp.presenters.whatsapp_presenter import WhatsAppPresenter, extract_relevant_whatsapp_message_details
-from ansari_whatsapp.utils.whatsapp_logger import get_logger
 from ansari_whatsapp.utils.config import get_settings
 from ansari_whatsapp.utils.general_helpers import CORSMiddlewareWithLogging
-
-logger = get_logger(__name__)
+from ansari_whatsapp.utils.whatsapp_logger import logger
 
 
 # Helper function for webhook responses

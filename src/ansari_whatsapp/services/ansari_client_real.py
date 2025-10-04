@@ -1,5 +1,5 @@
-# API Client for ansari-whatsapp
-"""Client for interacting with the Ansari backend API."""
+# Real API Client for ansari-whatsapp
+"""Real client implementation for interacting with the Ansari backend API via HTTP."""
 
 import httpx
 
@@ -14,12 +14,13 @@ from ansari_whatsapp.utils.exceptions import (
     ThreadInfoError,
     MessageProcessingError,
 )
+from ansari_whatsapp.services.ansari_client_base import AnsariClientBase
 
 logger = get_logger(__name__)
 
 
-class AnsariClient:
-    """Client for the Ansari backend API."""
+class AnsariClientReal(AnsariClientBase):
+    """Real client for the Ansari backend API that makes actual HTTP requests."""
 
     def __init__(self):
         """Initialize the Ansari API client."""

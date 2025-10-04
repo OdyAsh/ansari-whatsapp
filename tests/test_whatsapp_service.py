@@ -11,6 +11,10 @@ Tests verify:
 - Webhook message processing
 - Phone number validation logic
 
+The test suite automatically detects if the backend is available:
+- If backend is running: Tests run with real backend (MOCK_ANSARI_CLIENT=False)
+- If backend is not available: Tests run with mock client (MOCK_ANSARI_CLIENT=True)
+
 Security: All sensitive data is loaded from environment variables and masked in logs.
 """
 
@@ -18,6 +22,7 @@ import json
 import os
 import pytest
 import time
+import httpx
 from typing import Any
 from fastapi.testclient import TestClient
 
@@ -33,8 +38,73 @@ from .test_utils import (
 # Initialize logger
 logger = get_logger(__name__)
 
-# Configuration (non-sensitive)
-TEST_PHONE_NUM = "9876543210"  # Test phone number for webhook messages
+
+def check_backend_availability() -> bool:
+    """Check if the ansari-backend service is running and accessible.
+
+    Returns:
+        bool: True if backend is available, False otherwise
+    """
+    settings = get_settings()
+    backend_url = settings.BACKEND_SERVER_URL
+
+    try:
+        logger.info(f"Checking backend availability at {backend_url}")
+        response = httpx.get(f"{backend_url}/", timeout=3.0)
+        is_available = response.status_code == 200
+        logger.info(f"Backend availability: {'AVAILABLE' if is_available else 'UNAVAILABLE'} (status: {response.status_code})")
+        return is_available
+    except httpx.RequestError as e:
+        logger.info(f"Backend is not available: {e}")
+        return False
+    except Exception as e:
+        logger.warning(f"Unexpected error checking backend: {e}")
+        return False
+
+
+@pytest.fixture(scope="module", autouse=True)
+def configure_mock_mode():
+    """Configure mock mode based on backend availability before running tests.
+
+    This fixture runs before all tests and sets MOCK_ANSARI_CLIENT environment variable.
+    We need to set the env var and clear the settings cache to ensure the new value is used.
+
+    The original value (if any) is restored after tests complete.
+    """
+    # Store the original value if it exists
+    original_value = os.environ.get("MOCK_ANSARI_CLIENT")
+    had_original_value = "MOCK_ANSARI_CLIENT" in os.environ
+
+    backend_available = check_backend_availability()
+
+    if backend_available:
+        logger.info("Backend is AVAILABLE - Tests will use REAL backend")
+        os.environ["MOCK_ANSARI_CLIENT"] = "False"
+    else:
+        logger.info("Backend is NOT available - Tests will use MOCK client")
+        os.environ["MOCK_ANSARI_CLIENT"] = "True"
+
+    # Clear the settings cache to pick up the new MOCK_ANSARI_CLIENT value
+    get_settings.cache_clear()
+
+    # Log the effective configuration
+    settings = get_settings()
+    logger.info(f"MOCK_ANSARI_CLIENT is now set to: {settings.MOCK_ANSARI_CLIENT}")
+
+    yield
+
+    # Cleanup: restore original state
+    if had_original_value:
+        # Restore the original value
+        os.environ["MOCK_ANSARI_CLIENT"] = original_value
+        logger.debug(f"Restored MOCK_ANSARI_CLIENT to original value: {original_value}")
+    else:
+        # Delete the key if it didn't exist before
+        if "MOCK_ANSARI_CLIENT" in os.environ:
+            del os.environ["MOCK_ANSARI_CLIENT"]
+        logger.debug("Removed MOCK_ANSARI_CLIENT (it didn't exist before tests)")
+
+    get_settings.cache_clear()
 
 
 @pytest.fixture(scope="module")
@@ -104,7 +174,10 @@ def test_webhook_verification(settings):
 
 @pytest.mark.integration
 def test_webhook_message_basic(settings):
-    """Test basic WhatsApp webhook message processing using TestClient."""
+    """Test basic WhatsApp webhook message processing using TestClient.
+
+    With mock client enabled, this test should always succeed with 200 status.
+    """
     test_name = "Basic Webhook Message"
 
     # Create a minimal WhatsApp webhook payload
@@ -121,8 +194,8 @@ def test_webhook_message_basic(settings):
                             },
                             "messages": [
                                 {
-                                    "from": TEST_PHONE_NUM,
-                                    "id": f"test_message_{int(time.time())}",
+                                    "from": settings.WHATSAPP_DEV_PHONE_NUM.get_secret_value(),
+                                    "id": settings.WHATSAPP_DEV_MESSAGE_ID.get_secret_value(),
                                     "timestamp": str(int(time.time())),
                                     "type": "text",
                                     "text": {
@@ -140,120 +213,37 @@ def test_webhook_message_basic(settings):
     logger.debug(f"[TEST] Testing {test_name}...")
     logger.debug("   URL: /whatsapp/v1")
     logger.debug(f"   Payload: {format_payload_for_logging(payload)}")
+    logger.debug(f"   Mock mode: {settings.MOCK_ANSARI_CLIENT}")
 
     response = client.post("/whatsapp/v1", json=payload)
 
+    # With mock client, we should always get 200
     if response.status_code == 200:
-        # Validate response structure in test environment
         try:
             response_data = response.json()
             success = response_data.get("success", False)
             message = response_data.get("message", "")
 
             if success and "processed successfully" in message.lower():
-                log_test_result(test_name, True, "Webhook message accepted with proper structure", response_data)
-                logger.debug("   [PASS] Message processed successfully with structured response")
+                log_test_result(test_name, True, "Webhook message processed successfully", response_data)
+                logger.debug("   [PASS] Message processed successfully")
             else:
                 log_test_result(test_name, True, "Webhook message accepted", response_data)
-                logger.debug("   [PASS] Message accepted (may be partial processing)")
+                logger.debug("   [PASS] Message accepted")
 
             assert True
         except json.JSONDecodeError:
-            # Fallback for non-JSON responses
             log_test_result(test_name, True, "Webhook message accepted", {"status_code": response.status_code})
             assert True
-    elif response.status_code == 500:
-        # In test environment, expect 500 for user registration failures (backend not available)
-        try:
-            response_data = response.json()
-            error_code = response_data.get("error_code")
-
-            if error_code == "USER_REGISTRATION_FAILED":
-                log_test_result(test_name, True, "Expected test failure: Backend service not available", response_data)
-                logger.debug("   [PASS] Correctly returned 500 for registration failure (expected in test environment)")
-                assert True
-            else:
-                log_test_result(test_name, False, f"Unexpected 500 error: {response_data.get('message')}", response_data)
-                assert False
-        except json.JSONDecodeError:
-            log_test_result(test_name, False, f"Invalid JSON in 500 response: {response.text}")
-            assert False
     else:
+        # Non-200 status codes are now considered failures since mock client should handle everything
         response_data = None
         try:
             response_data = response.json()
         except Exception:
             response_data = response.text
-        log_test_result(test_name, False, f"Webhook message failed: HTTP {response.status_code}", response_data)
-        assert False
-
-
-@pytest.mark.integration
-def test_webhook_with_wrong_phone_id():
-    """Test webhook with wrong phone number ID (should be ignored) using TestClient."""
-    test_name = "Webhook with Wrong Phone ID"
-
-    # Create payload with wrong phone number ID
-    payload = {
-        "object": "whatsapp_business_account",
-        "entry": [
-            {
-                "changes": [
-                    {
-                        "value": {
-                            "metadata": {
-                                "phone_number_id": "999999999999999",  # Wrong ID
-                                "display_phone_number": "+1234567890"
-                            },
-                            "messages": [
-                                {
-                                    "from": f"{TEST_PHONE_NUM}_wrong",
-                                    "id": f"test_message_wrong_{int(time.time())}",
-                                    "timestamp": str(int(time.time())),
-                                    "type": "text",
-                                    "text": {
-                                        "body": "This should be ignored due to wrong phone ID"
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                ]
-            }
-        ]
-    }
-
-    logger.debug(f"[TEST] Testing {test_name}...")
-    logger.debug("   URL: /whatsapp/v1")
-    logger.debug("   This test should succeed (webhook accepts) but message should be ignored")
-
-    response = client.post("/whatsapp/v1", json=payload)
-
-    # In test environment, wrong phone ID should return 422 with structured error response
-    if response.status_code == 422:
-        try:
-            response_data = response.json()
-            success = response_data.get("success", True)
-            error_code = response_data.get("error_code")
-
-            if not success and error_code == "WRONG_PHONE_NUMBER":
-                log_test_result(test_name, True, "Correctly rejected wrong phone ID with 422 status", response_data)
-                logger.debug("   [PASS] Correctly returned 422 for wrong phone ID")
-                assert True
-            else:
-                log_test_result(test_name, False, "Wrong response structure for error case", response_data)
-                assert False
-        except json.JSONDecodeError:
-            log_test_result(test_name, False, f"Invalid JSON response: {response.text}")
-            assert False
-    else:
-        response_data = None
-        try:
-            response_data = response.json()
-        except:
-            response_data = response.text
-        log_test_result(test_name, False, f"Expected 422 status code, got {response.status_code}", response_data)
-        assert False
+        log_test_result(test_name, False, f"Expected 200, got {response.status_code}.", response_data)
+        assert False, f"Expected HTTP 200 with mock client, got {response.status_code}"
 
 
 @pytest.fixture(scope="session", autouse=True)

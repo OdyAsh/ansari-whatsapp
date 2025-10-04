@@ -81,12 +81,32 @@ class WhatsAppSettings(BaseSettings):
     # Chat settings
     WHATSAPP_UNDER_MAINTENANCE: bool = False
     WHATSAPP_CHAT_RETENTION_HOURS: int
+    WHATSAPP_MESSAGE_AGE_THRESHOLD_SECONDS: int
+
+    # Test/Development settings
+    WHATSAPP_DEV_PHONE_NUM: SecretStr = SecretStr("201234567899")
+    # WhatsApp message ID for testing typing indicators/read receipts
+    # This must be a real message ID obtained from a real WhatsApp webhook request
+    # To obtain: Send a real message from WHATSAPP_DEV_PHONE_NUM, log the webhook payload,
+    # and copy the message ID from the "id" field in the "messages" array
+    # Format: "wamid." followed by 72 characters (base64-encoded)
+    # If not set correctly, you'll get: HTTP 400 error with "#131009 Parameter value is not valid"
+    WHATSAPP_DEV_MESSAGE_ID: SecretStr = SecretStr("wamid.seventy_two_char_hash")
 
     # Logging settings
     LOGGING_LEVEL: str = "INFO"
     # If True, only log messages from test files (i.e., files in "tests" folder or files starting with "test_")
     #   Otherwise, log messages coming from any file
     LOG_TEST_FILES_ONLY: bool = False
+
+    # Service Provider settings
+    # If True, use mock Ansari client instead of making real HTTP calls to backend
+    # Useful for development/testing without requiring the backend service to be running
+    MOCK_ANSARI_CLIENT: bool = False
+
+    # If True, use mock Meta API service instead of making real HTTP calls to Meta WhatsApp API
+    # Useful for development/testing when Meta API credentials are invalid or to avoid consuming API quota
+    MOCK_META_API: bool = False
 
     ########### Validators ###########
 

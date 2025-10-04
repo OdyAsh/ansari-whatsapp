@@ -6,13 +6,11 @@ import asyncio
 import time
 from datetime import datetime, timezone
 
-import httpx
-
 from ansari_whatsapp.utils.whatsapp_logger import get_logger
 from ansari_whatsapp.utils.config import get_settings
-from ansari_whatsapp.utils.ansari_client import AnsariClient
+from ansari_whatsapp.services.service_provider import get_ansari_client
+from ansari_whatsapp.services.meta_service_provider import get_meta_api_service
 from ansari_whatsapp.utils.exceptions import (
-    AnsariClientError,
     UserRegistrationError,
     UserExistsCheckError,
     UserLocationUpdateError,
@@ -27,10 +25,7 @@ from ansari_whatsapp.utils.language_utils import (
 
 logger = get_logger(__name__)
 
-# Global configuration variables
 settings = get_settings()
-META_API_URL = settings.META_API_URL
-META_ACCESS_TOKEN = settings.META_ACCESS_TOKEN_FROM_SYS_USER.get_secret_value()
 
 
 async def extract_relevant_whatsapp_message_details(
@@ -77,6 +72,9 @@ async def extract_relevant_whatsapp_message_details(
     incoming_phone_number_id = value["metadata"]["phone_number_id"]
     configured_phone_number_id = settings.META_BUSINESS_PHONE_NUMBER_ID.get_secret_value()
     is_target_business_number = incoming_phone_number_id == configured_phone_number_id
+
+    if not is_target_business_number:
+        return None, is_target_business_number, None, None, None, None, None
 
     if "statuses" in value:
         # status = value["statuses"]["status"]
@@ -148,8 +146,9 @@ class WhatsAppPresenter:
         self.message_id = message_id
         self.message_unix_time = message_unix_time
 
-        # Initialize client and tracking variables
-        self.ansari_client = AnsariClient()
+        # Initialize services and tracking variables
+        self.ansari_client = get_ansari_client()
+        self.meta_api_service = get_meta_api_service()
         self.typing_indicator_task = None
         self.first_indicator_time = None
 
@@ -205,8 +204,8 @@ class WhatsAppPresenter:
         Returns:
             bool: True if the message is older than 24 hours, False otherwise
         """
-        # Define the too old threshold (24 hours in seconds)
-        TOO_OLD_THRESHOLD = 20  # TODO NOW: Return 24 * 60 * 60  # 24 hours in seconds
+        # Get the threshold from settings
+        TOO_OLD_THRESHOLD = get_settings().WHATSAPP_MESSAGE_AGE_THRESHOLD_SECONDS
 
         # If there's no timestamp, message can't be verified as too old
         if not self.message_unix_time:
@@ -291,30 +290,13 @@ class WhatsAppPresenter:
             logger.error("Cannot send typing indicator: missing user_phone_num or message_id")
             return
 
-        headers = {
-            "Authorization": f"Bearer {META_ACCESS_TOKEN}",
-            "Content-Type": "application/json",
-        }
-
         try:
-            async with httpx.AsyncClient() as client:
-                logger.debug(f"Sending typing indicator to WhatsApp user {self.user_phone_num}")
-
-                json_data = {
-                    "messaging_product": "whatsapp",
-                    "status": "read",
-                    "message_id": self.message_id,
-                    "typing_indicator": {"type": "text"},
-                }
-
-                response = await client.post(META_API_URL, headers=headers, json=json_data)
-                response.raise_for_status()  # Raise an exception for HTTP errors
-
-                logger.info("Sent")
-
+            await self.meta_api_service.send_typing_indicator(
+                recipient_phone=self.user_phone_num,
+                message_id=self.message_id
+            )
         except Exception as e:
-            logger.error(f"Error sending typing indicator: {e}. Details are in next log.")
-            logger.exception(e)
+            logger.exception(f"Error sending typing indicator: {e}")
 
     async def send_whatsapp_message(
         self,
@@ -336,37 +318,17 @@ class WhatsAppPresenter:
             logger.error("Cannot send WhatsApp message: No recipient phone number provided")
             return
 
-        headers = {
-            "Authorization": f"Bearer {META_ACCESS_TOKEN}",
-            "Content-Type": "application/json",
-        }
-
-        # Split the message if it exceeds WhatsApp's character limit
+        # Split the message if it exceeds WhatsApp's character limit (business logic stays in presenter)
         message_parts = self._split_long_messages(msg_body)
 
         try:
-            async with httpx.AsyncClient() as client:
-                logger.debug(f"SENDING REQUEST TO: {META_API_URL}")
-
-                logger.info(f"Sending WhatsApp message to user {phone_num} with the following message part(s):\n\n")
-
-                # If we have multiple parts, send them sequentially
-                for part in message_parts:
-                    json_data = {
-                        "messaging_product": "whatsapp",
-                        "to": phone_num,
-                        "text": {"body": part},
-                    }
-
-                    response = await client.post(META_API_URL, headers=headers, json=json_data)
-                    response.raise_for_status()  # Raise an exception for HTTP errors
-
-                    if msg_body != "...":
-                        logger.info("\n".join(f"[Part {i + 1}]: \n{part}" for i, part in enumerate(message_parts)))
-
+            # Delegate to Meta API service (infrastructure concern)
+            await self.meta_api_service.send_message(
+                recipient_phone=phone_num,
+                message_parts=message_parts
+            )
         except Exception as e:
-            logger.error(f"Error sending message: {e}")
-            logger.exception(e)
+            logger.exception(f"Error sending WhatsApp message: {e}")
 
     def _calculate_time_passed(self, last_message_time: datetime | None) -> tuple[float, str]:
         """
@@ -782,8 +744,6 @@ class WhatsAppPresenter:
                 if self.typing_indicator_task and not self.typing_indicator_task.done():
                     self.typing_indicator_task.cancel()
                 return
-
-            logger.warning(f"{response=}")  # TODO NOW: remove
 
             # Cancel the typing indicator task if it's still running
             if self.typing_indicator_task and not self.typing_indicator_task.done():

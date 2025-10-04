@@ -22,7 +22,8 @@ class CORSMiddlewareWithLogging(CORSMiddleware):
         # Log detailed request information upfront to help debug CORS issues
         origin = request.headers.get("origin")
         host = request.headers.get("host")
-        logger.debug(f"Incoming CORS Request: origin={origin}, host={host}")
+        if "zrok" not in host:
+            logger.debug(f"Incoming CORS Request: origin={origin}, host={host}")
         origin = origin if origin else host
 
         # Pre-check for CORS issues

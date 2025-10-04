@@ -8,9 +8,18 @@ from datetime import datetime, timezone
 
 import httpx
 
-from ansari_whatsapp.utils.whatsapp_logger import get_logger, make_error_handler
+from ansari_whatsapp.utils.whatsapp_logger import get_logger
 from ansari_whatsapp.utils.config import get_settings
 from ansari_whatsapp.utils.ansari_client import AnsariClient
+from ansari_whatsapp.utils.exceptions import (
+    AnsariClientError,
+    UserRegistrationError,
+    UserExistsCheckError,
+    UserLocationUpdateError,
+    ThreadCreationError,
+    ThreadInfoError,
+    MessageProcessingError,
+)
 from ansari_whatsapp.utils.language_utils import (
     get_language_direction_from_text,
     get_language_from_text,
@@ -231,7 +240,6 @@ class WhatsAppPresenter:
             logger.error(f"Error parsing message timestamp: {e}")
             return False
 
-    @logger.catch(onerror=make_error_handler("Error checking and registering user"), default=False)
     async def check_and_register_user(self) -> bool:
         """
         Checks if the user's phone number is stored in the users table.
@@ -244,28 +252,37 @@ class WhatsAppPresenter:
             logger.error("Cannot check and register user: user_phone_num is not set")
             return False
 
-        # Check if the user's phone number exists
-        user_exists = await self.ansari_client.check_user_exists(self.user_phone_num)
+        try:
+            # Check if the user's phone number exists
+            user_exists = await self.ansari_client.check_user_exists(self.user_phone_num)
 
-        if user_exists:
-            return True
+            if user_exists:
+                return True
 
-        # Else, register the user with the detected language
-        if self.incoming_msg_type == "text":
-            # TODO: ask claude to fix error: AttributeError: 'WhatsAppPresenter' object has no attribute 'incoming_msg_body'
-            incoming_msg_text = self.incoming_msg_body["body"]
-            user_lang = get_language_from_text(incoming_msg_text)
-        else:
-            # Use English as default language if we can't detect it
-            user_lang = "en"
+            # Else, register the user with the detected language
+            if self.incoming_msg_type == "text":
+                incoming_msg_text = self.incoming_msg_body["body"]
+                user_lang = get_language_from_text(incoming_msg_text)
+            else:
+                # Use English as default language if we can't detect it
+                user_lang = "en"
 
-        result = await self.ansari_client.register_user(self.user_phone_num, user_lang)
+            result = await self.ansari_client.register_user(self.user_phone_num, user_lang)
 
-        if result.get("status") == "success":
             logger.info(f"Registered new whatsapp user (lang: {user_lang}): {self.user_phone_num}")
             return True
-        else:
-            logger.error(f"Failed to register new whatsapp user: {self.user_phone_num}")
+
+        except UserExistsCheckError as e:
+            logger.error(f"Failed to check if user exists: {e}")
+            return False
+        except UserRegistrationError as e:
+            logger.error(f"Failed to register user {self.user_phone_num}: {e}")
+            await self.send_whatsapp_message(
+                "Sorry, we couldn't register your account. Please try again later."
+            )
+            return False
+        except Exception as e:
+            logger.exception(f"Unexpected error checking/registering user: {e}")
             return False
 
     async def _send_whatsapp_typing_indicator(self) -> None:
@@ -299,7 +316,6 @@ class WhatsAppPresenter:
             logger.error(f"Error sending typing indicator: {e}. Details are in next log.")
             logger.exception(e)
 
-    @logger.catch(onerror=make_error_handler("Error sending WhatsApp message"))
     async def send_whatsapp_message(
         self,
         msg_body: str,
@@ -700,7 +716,6 @@ class WhatsAppPresenter:
 
         return chunks
 
-    @logger.catch(onerror=make_error_handler("Error processing text message"))
     async def handle_text_message(self) -> None:
         """
         Processes the incoming text message and sends a response to the WhatsApp sender.
@@ -714,9 +729,16 @@ class WhatsAppPresenter:
             logger.debug(f"Whatsapp user said: {incoming_txt_msg}")
 
             # Get details of the thread that the user last interacted with
-            last_thread_info = await self.ansari_client.get_last_thread_info(self.user_phone_num)
-            thread_id = last_thread_info.get("thread_id")
-            last_msg_time = last_thread_info.get("last_message_time")
+            try:
+                last_thread_info = await self.ansari_client.get_last_thread_info(self.user_phone_num)
+                thread_id = last_thread_info.get("thread_id")
+                last_msg_time = last_thread_info.get("last_message_time")
+            except ThreadInfoError as e:
+                logger.error(f"Failed to get thread info: {e}")
+                await self.send_whatsapp_message(
+                    "Sorry, we're having trouble accessing your chat history. Please try again later."
+                )
+                return
 
             if last_msg_time and isinstance(last_msg_time, str):
                 last_msg_time = datetime.fromisoformat(last_msg_time.replace("Z", "+00:00"))
@@ -733,25 +755,33 @@ class WhatsAppPresenter:
             if thread_id is None or passed_time > allowed_time:
                 first_few_words = " ".join(incoming_txt_msg.split()[:6])
 
-                result = await self.ansari_client.create_thread(self.user_phone_num, first_few_words)
-
-                if "error" in result:
-                    logger.error(f"Error creating a new thread for whatsapp user: {result['error']}")
+                try:
+                    result = await self.ansari_client.create_thread(self.user_phone_num, first_few_words)
+                    thread_id = result.get("thread_id")
+                    logger.info("Created a new thread for the whatsapp user, " + "as the allowed retention time has passed.")
+                except ThreadCreationError as e:
+                    logger.error(f"Failed to create thread: {e}")
                     await self.send_whatsapp_message(
-                        "An unexpected error occurred while creating a new chat session. Please try again later.",
+                        "An unexpected error occurred while creating a new chat session. Please try again later."
                     )
                     return
 
-                thread_id = result.get("thread_id")
-
-                logger.info("Created a new thread for the whatsapp user, " + "as the allowed retention time has passed.")
-
             # Process the message using the Ansari backend API
-            response = await self.ansari_client.process_message(
-                phone_num=self.user_phone_num,
-                thread_id=thread_id,
-                message=incoming_txt_msg,
-            )
+            try:
+                response = await self.ansari_client.process_message(
+                    phone_num=self.user_phone_num,
+                    thread_id=thread_id,
+                    message=incoming_txt_msg,
+                )
+            except MessageProcessingError as e:
+                logger.error(f"Failed to process message: {e}")
+                await self.send_whatsapp_message(
+                    "An error occurred while processing your message. Please try again later."
+                )
+                # Cancel typing indicator if running
+                if self.typing_indicator_task and not self.typing_indicator_task.done():
+                    self.typing_indicator_task.cancel()
+                return
 
             logger.warning(f"{response=}")  # TODO NOW: remove
 
@@ -782,10 +812,13 @@ class WhatsAppPresenter:
             await self.send_whatsapp_message(response)
 
         except Exception as e:
-            logger.exception(f"Error processing text message: {e}")
+            logger.exception(f"Unexpected error processing text message: {e}")
             await self.send_whatsapp_message(
                 "An unexpected error occurred while processing your message. Please try again later.",
             )
+            # Cancel typing indicator if running
+            if self.typing_indicator_task and not self.typing_indicator_task.done():
+                self.typing_indicator_task.cancel()
 
     async def handle_location_message(self) -> None:
         """
@@ -796,14 +829,25 @@ class WhatsAppPresenter:
             logger.error("Cannot process location message: user_phone_num is not set")
             return
 
-        loc = self.incoming_msg_body
-        result = await self.ansari_client.update_user_location(self.user_phone_num, loc["latitude"], loc["longitude"])
+        try:
+            loc = self.incoming_msg_body
+            result = await self.ansari_client.update_user_location(
+                self.user_phone_num,
+                loc["latitude"],
+                loc["longitude"]
+            )
 
-        if result.get("status") == "success":
             await self.send_whatsapp_message("Stored your location successfully!")
-        else:
+
+        except UserLocationUpdateError as e:
+            logger.error(f"Failed to update user location: {e}")
             await self.send_whatsapp_message(
-                "Sorry, we couldn't update your location. Please try again later.",
+                "Sorry, we couldn't update your location. Please try again later."
+            )
+        except Exception as e:
+            logger.exception(f"Unexpected error updating location: {e}")
+            await self.send_whatsapp_message(
+                "Sorry, we couldn't update your location. Please try again later."
             )
 
     async def handle_unsupported_message(self) -> None:

@@ -36,6 +36,8 @@ Secure logging and testing utilities:
    ```env
    META_WEBHOOK_VERIFY_TOKEN=your_verify_token
    META_BUSINESS_PHONE_NUMBER_ID=your_phone_number_id
+   ALWAYS_RETURN_OK_TO_META=True  # Set to False for CI/CD
+   LOG_TEST_FILES_ONLY=False      # Set to True to filter test logs
    ```
 
 2. **Install Dependencies**:
@@ -48,9 +50,14 @@ Secure logging and testing utilities:
 
 #### WhatsApp Service Tests (This Repo)
 ```bash
-# All WhatsApp service tests
+# All WhatsApp service tests (local development)
 pytest tests/test_whatsapp_service.py -v
 
+# With test-only logging (filters out non-test logs)
+LOG_TEST_FILES_ONLY=True pytest tests/test_whatsapp_service.py -v -s
+
+# For CI/CD (proper HTTP status codes)
+ALWAYS_RETURN_OK_TO_META=False pytest tests/test_whatsapp_service.py -v
 ```
 
 #### WhatsApp API Tests (ansari-backend repo)
@@ -88,6 +95,15 @@ pytest tests/unit/test_whatsapp_api_endpoints.py -m streaming -v
 - ✅ **Uses TestClient** for WhatsApp service testing
 - ✅ **Environment secrets** properly loaded
 - ✅ **Fast execution** with in-memory testing
+- ⚠️ **Important**: Set `ALWAYS_RETURN_OK_TO_META=False` in CI/CD workflows to get proper HTTP status codes for assertions
+
+**Example GitHub Actions workflow:**
+```yaml
+- name: Run tests
+  env:
+    ALWAYS_RETURN_OK_TO_META: False
+  run: pytest tests/ -v
+```
 
 ### ansari-backend CI/CD
 - ✅ **No external server dependencies** for API tests

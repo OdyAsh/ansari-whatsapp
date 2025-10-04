@@ -65,8 +65,11 @@ class WhatsAppSettings(BaseSettings):
     DEPLOYMENT_TYPE: str = Field(
         ...,
         description="Deployment environment type",
-        pattern="^(local|staging|production|test)$",
+        pattern="^(local|staging|production)$",
     )
+
+    # Meta webhook response behavior
+    ALWAYS_RETURN_OK_TO_META: bool = True
 
     # Server settings
     HOST: str
@@ -80,7 +83,10 @@ class WhatsAppSettings(BaseSettings):
     WHATSAPP_CHAT_RETENTION_HOURS: int
 
     # Logging settings
-    LOGGING_LEVEL: str
+    LOGGING_LEVEL: str = "INFO"
+    # If True, only log messages from test files (i.e., files in "tests" folder or files starting with "test_")
+    #   Otherwise, log messages coming from any file
+    LOG_TEST_FILES_ONLY: bool = False
 
     ########### Validators ###########
 
@@ -117,19 +123,17 @@ class WhatsAppSettings(BaseSettings):
             # Add zrok origin (i.e., the webhook (callback url)) that Meta will send messages to)
             zrok_token = info.data.get("META_WEBHOOK_ZROK_SHARE_TOKEN")
             token_value = zrok_token.get_secret_value()
-            # TODO NOW: suffix /whatsapp/v1 if things don't work
             # NOTE: We don't add "https://" as Meta sends request in "host" header, not "origin",
-            #   and it so it doesn't send the "https://" prefix
+            #   and so, a value in "host" header means it won't contain the "https://" prefix
             #   However, even if you don't explicitly remove the "https://" part,
-            #   then apparently FastAPI still correctly recognizes the host
+            #   apparently FastAPI will still correctly recognize the host
             webhook_origin = f"{token_value}.share.zrok.io"
             if webhook_origin not in origins:
                 origins.append(webhook_origin)
 
         # Make sure CI/CD of GitHub Actions is allowed in all environments
         if "testserver" not in origins:
-            github_actions_origin = "testserver"
-            origins.append(github_actions_origin)
+            origins.append("testserver")
 
         return origins
 

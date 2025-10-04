@@ -61,14 +61,15 @@ def create_webhook_response(
     if details:
         response_body["details"] = details
 
-    # In test environment: return proper HTTP status codes
-    if settings.DEPLOYMENT_TYPE == "test":
+    # When ALWAYS_RETURN_OK_TO_META is False: return proper HTTP status codes (for testing)
+    # When ALWAYS_RETURN_OK_TO_META is True: always return 200 for Meta compliance
+    if not settings.ALWAYS_RETURN_OK_TO_META:
         return JSONResponse(
             content=response_body,
             status_code=status_code if not success else 200
         )
 
-    # In production environments: always return 200 for Meta compliance
+    # Always return 200 for Meta compliance (production behavior)
     # But still include structured response body for logging/debugging
     return JSONResponse(
         content=response_body,

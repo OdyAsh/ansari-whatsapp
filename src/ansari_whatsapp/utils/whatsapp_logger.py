@@ -12,55 +12,8 @@ from ansari_whatsapp.utils.config import get_settings
 # Create logs directory if it doesn't exist
 os.makedirs("logs", exist_ok=True)
 
-# Flag to track whether logger has been configured
-_LOGGER_CONFIGURED = False
-
-
-def configure_logger():
-    """Configure global loguru logger settings. This should be called only once."""
-    global _LOGGER_CONFIGURED
-
-    # Only configure if not already done
-    if _LOGGER_CONFIGURED:
-        return
-
-    # Clear any existing handlers
-    logger.remove()
-
-    # Get settings
-    settings = get_settings()
-    logging_level = settings.LOGGING_LEVEL.upper() if hasattr(settings, "LOGGING_LEVEL") else "INFO"
-
-    # Use file name only for local deployment, as it can be ctrl+clicked by VSCode
-    #   E.g.: whatsapp_presenter:56
-    if settings.DEPLOYMENT_TYPE == "local":
-        name_format = "{file}"
-    else:
-        # Use full module name for non-local deployments
-        #   E.g.: ansari_whatsapp.utils.whatsapp_logger:56
-        name_format = "{name}"
-
-    # Add console handler with custom format
-    logger.add(
-        sys.stderr,
-        format=(
-            "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
-            "<level>{level: <4}</level> | "
-            f"<cyan>{name_format}</cyan>:<cyan>{{line}}</cyan> "
-            "<blue>[{function}()]</blue> | "
-            "<level>{message}</level>"
-        ),
-        level=logging_level,
-        colorize=True,
-        backtrace=False,
-        diagnose=True,
-    )
-
-    _LOGGER_CONFIGURED = True
-
-
-# Initialize the logger configuration at import time
-configure_logger()
+# Track which modules have already been configured to avoid duplicate handlers
+_configured_modules = set()
 
 
 def get_logger(name: str):
@@ -72,34 +25,86 @@ def get_logger(name: str):
     Returns:
         A bound loguru logger instance configured for the specific module.
     """
-    # Ensure logger is configured (will only happen once)
-    configure_logger()
+    # Only configure handlers once per module
+    if name in _configured_modules:
+        return logger.bind(name=name)
+
+    _configured_modules.add(name)
+
+    # Create a module-specific logger by binding the name
+    module_logger = logger.bind(name=name)
 
     # Get settings
     settings = get_settings()
 
-    # Define log file path for this specific module
-    log_dir = os.path.join(os.getcwd(), "logs")
-    os.makedirs(log_dir, exist_ok=True)
-    module_log_file = os.path.join(log_dir, f"{name.replace('.', '_')}.log")
+    # Use file name only for local deployment, as it can be ctrl+clicked by VSCode
+    #   E.g.: whatsapp_presenter:56
+    if settings.DEPLOYMENT_TYPE == "local":
+        name_format = "{file}"
+    else:
+        # Use full module name for non-local deployments
+        #   E.g.: ansari_whatsapp.utils.whatsapp_logger:56
+        name_format = "{name}"
 
-    if not settings.DEPLOYMENT_TYPE == "local":
-        logger.bind(name=name)
-        return logger
+    # Combined filter for all handlers
+    def log_filter(record):
+        """
+        Filter logs based on module specificity and test file settings.
 
-    logger.add(
-        module_log_file,
-        format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}/{module}:{line} [{function}()] | {message}",
+        Args:
+            record: The log record being processed.
+        """
+        # Filter 1: Module-specific filtering (so that each handler only logs its own module's messages to terminal/file)
+        #   I.e., if the current logger's `name` is not the same as the record's `name`, filter it out
+        filter_1 = record.get("extra", {}).get("name", "") != name
+
+        # Filter 2: Test files only (when LOG_TEST_FILES_ONLY is True)
+        #  I.e., if LOG_TEST_FILES_ONLY is True, only allow logs from files in "tests" folder or files starting with "test_"
+        filter_2 = settings.LOG_TEST_FILES_ONLY and not (
+            "tests" in record["file"].path or "test_" in record["file"].name
+        )
+
+        if filter_1 or filter_2:
+            return False
+
+        return True
+
+    # Add console handler for terminal output
+    module_logger.add(
+        sys.stderr,
+        format=(
+            "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+            "<level>{level: <4}</level> | "
+            f"<cyan>{name_format}</cyan>:<cyan>{{line}}</cyan> "
+            "<blue>[{function}()]</blue> | "
+            "<level>{message}</level>"
+        ),
         level=settings.LOGGING_LEVEL.upper(),
         enqueue=True,
+        colorize=True,
         backtrace=True,
-        diagnose=True,
+        diagnose=settings.DEPLOYMENT_TYPE == "local",
+        filter=log_filter,
         catch=False,
     )
 
-    # Return a logger bound to the module name
-    return logger.bind(name=name)
+    # Add file logging for test files (when enabled)
+    if settings.DEPLOYMENT_TYPE == "local":
+        # Define log file path for this specific module
+        log_dir = os.path.join(os.getcwd(), "logs")
+        os.makedirs(log_dir, exist_ok=True)
+        module_log_file = os.path.join(log_dir, f"{name.replace('.', '_')}.log")
+        module_logger.add(
+            module_log_file,
+            format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {file}:{line} [{function}()] | {message}",
+            level=settings.LOGGING_LEVEL.upper(),
+            filter=log_filter,
+            rotation="10 MB",
+            catch=False,
+        )
 
+
+    return module_logger
 
 # Error handler factory that creates context-specific error handlers
 def make_error_handler(context: str, default_return: dict | Any = None) -> Callable:

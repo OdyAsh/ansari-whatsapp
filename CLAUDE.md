@@ -29,8 +29,21 @@ This is the `ansari-whatsapp` microservice that handles WhatsApp webhook request
 - **Installation:** `uv add pytest`
 - **Run tests:** `pytest tests/ -v`
 - **Logging Modes:**
-  - `pytest tests/ -v -s` → all logs including FastAPI
-  - `pytest tests/ -v -s --log-mode=test-only` → test-only logs (filters out FastAPI/TestClient noise)
+  - `pytest tests/ -v -s` → all logs from all files to console
+  - `LOG_TEST_FILES_ONLY=True pytest tests/ -v -s` → only test file logs to console + `logs/test_run.log`
+
+**CI/CD Test Commands:**
+When running tests in CI/CD pipelines, set `ALWAYS_RETURN_OK_TO_META=False` to get proper HTTP status codes for test assertions:
+```bash
+# Linux/Mac
+ALWAYS_RETURN_OK_TO_META=False pytest tests/ -v
+
+# Windows PowerShell
+$env:ALWAYS_RETURN_OK_TO_META="False"; pytest tests/ -v
+
+# Windows CMD
+set ALWAYS_RETURN_OK_TO_META=False && pytest tests/ -v
+```
 
 ### Security Requirements
 - **Environment Variables:** Load sensitive data from `.env` file using `get_env_var()`
@@ -51,9 +64,15 @@ The `/api/v2/whatsapp/messages/process` endpoint streams responses. Tests should
 - Test timeout scenarios and error handling
 
 ### Environment Variables Required
+Key environment variables (see `.env.example` for full list):
 ```env
+# Meta/WhatsApp settings
 META_WEBHOOK_VERIFY_TOKEN=your_verify_token
 META_BUSINESS_PHONE_NUMBER_ID=your_phone_id
+
+# Test behavior settings
+ALWAYS_RETURN_OK_TO_META=True  # Set to False in CI/CD for proper status codes
+LOG_TEST_FILES_ONLY=False      # Set to True to only log from test files
 ```
 
 ### Services Dependencies
@@ -85,5 +104,7 @@ pytest tests/unit/test_whatsapp_api_endpoints.py -m streaming -v
 - Implemented secure logging with sensitive data masking
 - Added proper environment variable handling
 - All security issues resolved (no hardcoded secrets)
+- Added `ALWAYS_RETURN_OK_TO_META` setting for controlling webhook response behavior
+- Added `LOG_TEST_FILES_ONLY` setting for filtering test logs
 
 **Remember: Always use `uv` for package management in this project!**

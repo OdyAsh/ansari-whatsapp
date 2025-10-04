@@ -41,27 +41,6 @@ TEST_PHONE_NUM = "9876543210"  # Test phone number for webhook messages
 def settings():
     return get_settings()
 
-
-@pytest.fixture(scope="session", autouse=True)
-def test_environment():
-    """Set up test environment configuration."""
-    # Set DEPLOYMENT_TYPE to 'test' for proper test responses
-    original_deployment_type = os.environ.get("DEPLOYMENT_TYPE")
-    os.environ["DEPLOYMENT_TYPE"] = "test"
-
-    # Clear the settings cache to ensure the new DEPLOYMENT_TYPE is used
-    get_settings.cache_clear()
-
-    yield
-
-    # Restore original value and clear cache again
-    if original_deployment_type is not None:
-        os.environ["DEPLOYMENT_TYPE"] = original_deployment_type
-    else:
-        os.environ.pop("DEPLOYMENT_TYPE", None)
-    get_settings.cache_clear()
-
-
 # Create TestClient
 client = TestClient(app)
 
@@ -277,8 +256,12 @@ def test_webhook_with_wrong_phone_id():
         assert False
 
 
-def test_save_results():
-    """Save test results to file (runs after all tests)."""
+@pytest.fixture(scope="session", autouse=True)
+def save_results():
+    """Save test results to file (runs after all tests in the session)."""
+    yield  # All tests run here
+    
+    # Teardown: runs after all tests, even if filtered by -k
     from datetime import datetime
 
     if test_results:

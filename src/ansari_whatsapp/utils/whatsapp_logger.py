@@ -15,6 +15,7 @@ os.makedirs("logs", exist_ok=True)
 # Track which modules have already been configured to avoid duplicate handlers
 _configured_modules = set()
 
+logger.remove()  # Remove default handler to prevent duplicate logs
 
 def get_logger(name: str):
     """Creates and returns a module-specific logger instance.
@@ -82,8 +83,8 @@ def get_logger(name: str):
         level=settings.LOGGING_LEVEL.upper(),
         enqueue=True,
         colorize=True,
-        backtrace=True,
-        diagnose=settings.DEPLOYMENT_TYPE == "local",
+        backtrace=False,
+        diagnose=False, # settings.DEPLOYMENT_TYPE == "local",
         filter=log_filter,
         catch=False,
     )

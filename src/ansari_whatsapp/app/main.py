@@ -203,8 +203,9 @@ async def main_webhook(request: Request, background_tasks: BackgroundTasks) -> R
         Response: HTTP response with status code 200.
     """
     # Wait for the incoming webhook message to be received as JSON
-    data = await request.json()
 
+    data = await request.json()
+    
     # Extract message details from the webhook payload using the standalone function
     try:
         (
@@ -221,10 +222,9 @@ async def main_webhook(request: Request, background_tasks: BackgroundTasks) -> R
         if not is_target_business_number:
             logger.debug("Ignoring webhook not intended for our WhatsApp business number")
             return create_webhook_response(
-                success=False,
-                message="Webhook not intended for our WhatsApp business number",
-                status_code=422,
-                error_code="WRONG_PHONE_NUMBER"
+                success=True,
+                message="Skipping, as this webhook is not intended for our WhatsApp business number",
+                status_code=200,
             )
 
         # Terminate if the incoming message is a status message (e.g., "delivered")
@@ -239,7 +239,7 @@ async def main_webhook(request: Request, background_tasks: BackgroundTasks) -> R
 
         logger.debug(f"Incoming whatsapp webhook message from {from_whatsapp_number}")
     except Exception as e:
-        logger.error(f"Error extracting message details: {e}")
+        logger.exception(f"Error extracting message details: {e}")
         return create_webhook_response(
             success=False,
             message="Error processing webhook payload",
@@ -286,10 +286,9 @@ async def main_webhook(request: Request, background_tasks: BackgroundTasks) -> R
     # If so, send a message to the user and return
     if user_presenter.is_message_too_old():
         return Response(status_code=200)  # TODO: Remove
-        response_msg = "Sorry, your message "
         user_msg_start = " ".join(incoming_msg_body.get("body", "").split(" ")[:5])
         if user_msg_start:
-            response_msg_cont = ' "' + user_msg_start + '" '
+            response_msg_cont = ' "' + user_msg_start + '..." '
         else:
             response_msg_cont = " "
         response_msg = f"Sorry, your message{response_msg_cont}is too old. Please send a new message."

@@ -14,7 +14,9 @@ https://www.perplexity.ai/search/explain-fastapi-s-backgroundta-rnpU7D19QpSxp2ZO
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.responses import HTMLResponse, Response, JSONResponse
 
-from ansari_whatsapp.presenters.whatsapp_presenter import WhatsAppPresenter, extract_relevant_whatsapp_message_details
+from ansari_whatsapp.services.whatsapp_conversation_manager import WhatsAppConversationManager
+from ansari_whatsapp.utils.whatsapp_webhook_parser import parse_webhook_payload
+from ansari_whatsapp.utils.time_utils import is_message_too_old
 from ansari_whatsapp.utils.whatsapp_logger import get_logger
 from ansari_whatsapp.utils.config import get_settings
 from ansari_whatsapp.utils.general_helpers import CORSMiddlewareWithLogging
@@ -261,7 +263,7 @@ async def main_webhook(request: Request, background_tasks: BackgroundTasks) -> R
             incoming_msg_body,
             message_id,
             message_unix_time,
-        ) = await extract_relevant_whatsapp_message_details(data)
+        ) = await parse_webhook_payload(data)
 
         # Check if this webhook is intended for our WhatsApp business phone number
         if not is_target_business_number:
@@ -293,8 +295,8 @@ async def main_webhook(request: Request, background_tasks: BackgroundTasks) -> R
             details={"error": str(e)}
         )
 
-    # Create a user-specific presenter instance for this request
-    user_presenter = WhatsAppPresenter(
+    # Create a user-specific conversation manager instance for this request
+    conversation_manager = WhatsAppConversationManager(
         user_phone_num=from_whatsapp_number,
         incoming_msg_type=incoming_msg_type,
         incoming_msg_body=incoming_msg_body,
@@ -306,7 +308,7 @@ async def main_webhook(request: Request, background_tasks: BackgroundTasks) -> R
     if get_settings().WHATSAPP_UNDER_MAINTENANCE:
         # Inform the user that the service is down for maintenance
         background_tasks.add_task(
-            user_presenter.send_whatsapp_message,
+            conversation_manager.send_whatsapp_message,
             "Ansari for WhatsApp is down for maintenance, please try again later or visit our website at https://ansari.chat.",
         )
         return create_webhook_response(
@@ -334,12 +336,12 @@ async def main_webhook(request: Request, background_tasks: BackgroundTasks) -> R
 
     # Start the typing indicator loop that will continue until message is processed
     background_tasks.add_task(
-        user_presenter.send_typing_indicator_then_start_loop,
+        conversation_manager.send_typing_indicator_then_start_loop,
     )
 
     # Check if there are more than xx hours have passed from the user's message to the current time
     # If so, send a message to the user and return
-    if user_presenter.is_message_too_old():
+    if is_message_too_old(message_unix_time):
         return create_webhook_response(
             success=False,
             message="Message too old, notified user",
@@ -349,10 +351,10 @@ async def main_webhook(request: Request, background_tasks: BackgroundTasks) -> R
 
     # Check if the user's phone number is stored and register if not
     # Returns false if user's not found and their registration fails
-    user_found: bool = await user_presenter.check_and_register_user()
+    user_found: bool = await conversation_manager.check_and_register_user()
     if not user_found:
         background_tasks.add_task(
-            user_presenter.send_whatsapp_message, "Sorry, we couldn't register you to our database. Please try again later."
+            conversation_manager.send_whatsapp_message, "Sorry, we couldn't register you to our database. Please try again later."
         )
         return create_webhook_response(
             success=False,
@@ -364,7 +366,7 @@ async def main_webhook(request: Request, background_tasks: BackgroundTasks) -> R
     # Check if the incoming message is a media type other than text
     if incoming_msg_type != "text":
         background_tasks.add_task(
-            user_presenter.handle_unsupported_message,
+            conversation_manager.handle_unsupported_message,
         )
         return create_webhook_response(
             success=False,
@@ -375,7 +377,7 @@ async def main_webhook(request: Request, background_tasks: BackgroundTasks) -> R
 
     # Process text messages sent by the WhatsApp user
     background_tasks.add_task(
-        user_presenter.handle_text_message,
+        conversation_manager.handle_text_message,
     )
 
     return create_webhook_response(

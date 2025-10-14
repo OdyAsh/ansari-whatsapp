@@ -12,7 +12,6 @@ from ansari_whatsapp.utils.config import get_settings
 from ansari_whatsapp.utils.exceptions import (
     UserRegistrationError,
     UserExistsCheckError,
-    UserLocationUpdateError,
     ThreadCreationError,
     ThreadHistoryError,
     ThreadInfoError,
@@ -66,8 +65,6 @@ def simulate_backend_behavior(
                         exception_class = UserRegistrationError
                     elif "exists" in func.__name__:
                         exception_class = UserExistsCheckError
-                    elif "location" in func.__name__:
-                        exception_class = UserLocationUpdateError
                     elif "thread" in func.__name__ and "create" in func.__name__:
                         exception_class = ThreadCreationError
                     elif "history" in func.__name__:
@@ -130,8 +127,6 @@ class AnsariClientMock(AnsariClientBase):
             "user_id": user_id,
             "phone_num": phone_num,
             "preferred_language": preferred_language,
-            "latitude": None,
-            "longitude": None,
         }
 
         logger.info(f"Mock: Registered user {phone_num} with ID {user_id}")
@@ -150,31 +145,6 @@ class AnsariClientMock(AnsariClientBase):
         exists = phone_num in self._users
         logger.debug(f"Mock: User {phone_num} exists: {exists}")
         return exists
-
-    @simulate_backend_behavior()
-    async def update_user_location(self, phone_num: str, latitude: float, longitude: float) -> dict:
-        """Mock location update.
-
-        Args:
-            phone_num: The user's WhatsApp phone number
-            latitude: Latitude coordinate
-            longitude: Longitude coordinate
-
-        Returns:
-            dict: Update result matching backend format
-
-        Raises:
-            UserLocationUpdateError: If user not found or simulated error (1% chance)
-        """
-        if phone_num not in self._users:
-            logger.error(f"Mock: User {phone_num} not found for location update")
-            raise UserLocationUpdateError("User not found")
-
-        self._users[phone_num]["latitude"] = latitude
-        self._users[phone_num]["longitude"] = longitude
-
-        logger.info(f"Mock: Updated location for {phone_num} to ({latitude}, {longitude})")
-        return {"status": "success", "message": "Location updated"}
 
     @simulate_backend_behavior()
     async def create_thread(self, phone_num: str, title: str) -> dict:
@@ -276,7 +246,7 @@ class AnsariClientMock(AnsariClientBase):
             message: The user's message
 
         Returns:
-            str: Mock AI response
+            str: Mock AI response (uses saved sample response if message contains "long")
 
         Raises:
             MessageProcessingError: If thread not found or simulated error (3% chance)
@@ -295,7 +265,21 @@ class AnsariClientMock(AnsariClientBase):
         thread["messages"].append({"role": "user", "content": message})
 
         # Generate mock AI response
-        response = f"I received your message. This is a *mock AI assistant* running in test mode. Your actual response would come from the real AI model.\n\nYour message: {message[:100]}"
+        response = f"This is a *mock AI assistant* running in test mode. Write 'long' to see a bigger mock response.\n\nYour message: {message[:100]}"
+        # If message contains "long", try to load the saved sample response from ansari-backend
+        if "long" in message.lower():
+            try:
+                from pathlib import Path
+                sample_file = Path(__file__).parent.parent.parent.parent / "docs" / "sample_backend_responses" / "sample_ansari_llm_response.txt"
+
+                if sample_file.exists():
+                    with open(sample_file, "r", encoding="utf-8") as f:
+                        response = f.read()
+                    logger.info(f"Mock: Using saved sample response from {sample_file}")
+                else:
+                    logger.warning(f"Mock: Sample response file not found at {sample_file}, using default response")
+            except Exception as e:
+                logger.warning(f"Mock: Failed to load sample response: {e}, using default response")
 
         # Add AI response to thread
         thread["messages"].append({"role": "assistant", "content": response})

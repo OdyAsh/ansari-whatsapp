@@ -13,7 +13,6 @@ from ansari_whatsapp.services.meta_service_provider import get_meta_api_service
 from ansari_whatsapp.utils.exceptions import (
     UserRegistrationError,
     UserExistsCheckError,
-    UserLocationUpdateError,
     ThreadCreationError,
     ThreadInfoError,
     MessageProcessingError,
@@ -779,36 +778,6 @@ class WhatsAppPresenter:
             # Cancel typing indicator if running
             if self.typing_indicator_task and not self.typing_indicator_task.done():
                 self.typing_indicator_task.cancel()
-
-    async def handle_location_message(self) -> None:
-        """
-        Handles an incoming location message by updating the user's location in the database
-        and sending a confirmation message.
-        """
-        if not self.user_phone_num:
-            logger.error("Cannot process location message: user_phone_num is not set")
-            return
-
-        try:
-            loc = self.incoming_msg_body
-            result = await self.ansari_client.update_user_location(
-                self.user_phone_num,
-                loc["latitude"],
-                loc["longitude"]
-            )
-
-            await self.send_whatsapp_message("Stored your location successfully!")
-
-        except UserLocationUpdateError as e:
-            logger.error(f"Failed to update user location: {e}")
-            await self.send_whatsapp_message(
-                "Sorry, we couldn't update your location. Please try again later."
-            )
-        except Exception as e:
-            logger.exception(f"Unexpected error updating location: {e}")
-            await self.send_whatsapp_message(
-                "Sorry, we couldn't update your location. Please try again later."
-            )
 
     async def handle_unsupported_message(self) -> None:
         """Handles an incoming unsupported message by sending an appropriate response."""

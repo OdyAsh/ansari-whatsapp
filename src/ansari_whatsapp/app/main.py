@@ -193,14 +193,59 @@ async def verification_webhook(request: Request) -> str | None:
 @app.post("/whatsapp/v1")
 async def main_webhook(request: Request, background_tasks: BackgroundTasks) -> Response:
     """
-    Handles the incoming WhatsApp webhook message.
+    Handles the incoming WhatsApp webhook message from Meta's WhatsApp Business API.
 
+    This is the main webhook endpoint that processes all incoming messages from WhatsApp users.
+    It performs several validation and filtering steps before processing user messages:
+
+    **Processing Flow:**
+    1. **Extract Message Details**: Parses the webhook payload to extract relevant information
+       (sender phone number, message type, message body, timestamps, etc.)
+    
+    2. **Validation Checks** (returns early if conditions met):
+       - Verifies the webhook is for our WhatsApp business number
+       - Filters out status messages (delivered, read, etc.)
+       - Checks if service is under maintenance
+       - Handles staging/local development routing (temporary workaround)
+       - Validates message age (rejects messages older than configured threshold)
+       - Verifies user registration status
+       - Filters unsupported message types (non-text messages)
+    
+    3. **Background Processing**:
+       - Starts typing indicator loop (shows user that bot is processing)
+       - Processes text messages asynchronously via background tasks
+    
+    **Early Return Scenarios:**
+    - Wrong business number: Returns 200 with skip message
+    - Status message: Returns 200 with status acknowledgment
+    - Maintenance mode: Sends maintenance message and returns 200
+    - Staging filter: Returns 200 if message prefixed with "!d" in staging
+    - Old message: Returns 200 after notifying user
+    - Registration failure: Returns 500 error response
+    - Unsupported media: Sends unsupported message and returns 200
+    
+    **Meta Webhook Compliance:**
+    - Must respond quickly (within 20 seconds) to avoid retries
+    - Returns 200 status code for successful receipt (actual processing happens in background)
+    - All actual message processing is delegated to background tasks
+    
     Args:
-        request (Request): The incoming HTTP request.
-        background_tasks (BackgroundTasks): The background tasks to be executed.
+        request (Request): The incoming HTTP request containing the webhook payload from Meta.
+        background_tasks (BackgroundTasks): FastAPI's background task manager for async processing.
 
     Returns:
-        Response: HTTP response with status code 200.
+        Response: HTTP response, typically with status code 200 to acknowledge receipt to Meta.
+                 Response structure depends on ALWAYS_RETURN_OK_TO_META setting.
+                 
+    Raises:
+        None: All exceptions are caught and handled, returning appropriate responses.
+              Errors are logged but don't prevent Meta from receiving a 200 response.
+    
+    Note:
+        - The function uses FastAPI's BackgroundTasks to process messages asynchronously,
+          ensuring quick responses to Meta while handling potentially long-running operations.
+        - The staging "!d" prefix filter is a temporary workaround until dedicated test numbers
+          are available for each environment.
     """
     # Wait for the incoming webhook message to be received as JSON
 
@@ -264,7 +309,12 @@ async def main_webhook(request: Request, background_tasks: BackgroundTasks) -> R
             user_presenter.send_whatsapp_message,
             "Ansari for WhatsApp is down for maintenance, please try again later or visit our website at https://ansari.chat.",
         )
-        return Response(status_code=200)
+        return create_webhook_response(
+            success=False,
+            message="Service under maintenance",
+            status_code=503,
+            error_code="MAINTENANCE_MODE"
+        )
 
     # Temporarycorner case while locally developing:
     #   Since the staging server is always running,
@@ -275,7 +325,12 @@ async def main_webhook(request: Request, background_tasks: BackgroundTasks) -> R
     # NOTE: Obviously, this temp. solution will be removed when we get a dedicated testing number for staging testing.
     if get_settings().DEPLOYMENT_TYPE == "staging" and incoming_msg_body.get("body", "").startswith("!d "):
         logger.debug("Incoming message is meant for a dev who's testing locally now, so will not process it in staging...")
-        return Response(status_code=200)
+        return create_webhook_response(
+            success=False,
+            message="Message filtered for local development",
+            status_code=202,
+            error_code="DEV_FILTER"
+        )
 
     # Start the typing indicator loop that will continue until message is processed
     background_tasks.add_task(
@@ -285,18 +340,12 @@ async def main_webhook(request: Request, background_tasks: BackgroundTasks) -> R
     # Check if there are more than xx hours have passed from the user's message to the current time
     # If so, send a message to the user and return
     if user_presenter.is_message_too_old():
-        return Response(status_code=200)  # TODO: Remove
-        user_msg_start = " ".join(incoming_msg_body.get("body", "").split(" ")[:5])
-        if user_msg_start:
-            response_msg_cont = ' "' + user_msg_start + '..." '
-        else:
-            response_msg_cont = " "
-        response_msg = f"Sorry, your message{response_msg_cont}is too old. Please send a new message."
-        background_tasks.add_task(
-            user_presenter.send_whatsapp_message,
-            response_msg,
+        return create_webhook_response(
+            success=False,
+            message="Message too old, notified user",
+            status_code=422,
+            error_code="MESSAGE_TOO_OLD"
         )
-        return Response(status_code=200)
 
     # Check if the user's phone number is stored and register if not
     # Returns false if user's not found and their registration fails
@@ -312,19 +361,17 @@ async def main_webhook(request: Request, background_tasks: BackgroundTasks) -> R
             error_code="USER_REGISTRATION_FAILED"
         )
 
-    # Check if the incoming message is a location
-    if incoming_msg_type == "location":
-        background_tasks.add_task(
-            user_presenter.handle_location_message,
-        )
-        return Response(status_code=200)
-
     # Check if the incoming message is a media type other than text
     if incoming_msg_type != "text":
         background_tasks.add_task(
             user_presenter.handle_unsupported_message,
         )
-        return Response(status_code=200)
+        return create_webhook_response(
+            success=False,
+            message="Unsupported message type handled",
+            status_code=415,
+            error_code="UNSUPPORTED_MESSAGE_TYPE"
+        )
 
     # Process text messages sent by the WhatsApp user
     background_tasks.add_task(

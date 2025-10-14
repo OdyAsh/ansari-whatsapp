@@ -8,7 +8,6 @@ from ansari_whatsapp.utils.config import get_settings
 from ansari_whatsapp.utils.exceptions import (
     UserRegistrationError,
     UserExistsCheckError,
-    UserLocationUpdateError,
     ThreadCreationError,
     ThreadHistoryError,
     ThreadInfoError,
@@ -86,40 +85,6 @@ class AnsariClientReal(AnsariClientBase):
         except httpx.RequestError as e:
             logger.error(f"Network error checking if user exists {phone_num}: {e}")
             raise UserExistsCheckError("Network error during user existence check") from e
-
-    async def update_user_location(self, phone_num: str, latitude: float, longitude: float) -> dict:
-        """
-        Update a WhatsApp user's location in the Ansari backend.
-
-        Args:
-            phone_num (str): The user's WhatsApp phone number.
-            latitude (float): The latitude of the user's location.
-            longitude (float): The longitude of the user's location.
-
-        Returns:
-            dict: The update result.
-
-        Raises:
-            UserLocationUpdateError: If the update fails.
-        """
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.put(
-                    f"{self.base_url}/api/v2/whatsapp/users/location",
-                    json={
-                        "phone_num": phone_num,
-                        "latitude": latitude,
-                        "longitude": longitude,
-                    },
-                )
-                response.raise_for_status()
-                return response.json()
-        except httpx.HTTPStatusError as e:
-            logger.error(f"HTTP error updating user location {phone_num}: {e.response.status_code}")
-            raise UserLocationUpdateError(f"Failed to update user location: HTTP {e.response.status_code}") from e
-        except httpx.RequestError as e:
-            logger.error(f"Network error updating user location {phone_num}: {e}")
-            raise UserLocationUpdateError("Network error during location update") from e
 
     async def create_thread(self, phone_num: str, title: str) -> dict:
         """
@@ -249,6 +214,24 @@ class AnsariClientReal(AnsariClientBase):
                     if not full_response:
                         logger.warning("Received empty response from backend")
                         return ""
+
+                    # # TEMPORARY: Save response to file for testing/mocking purposes
+                    # # Comment out this block when you don't want to update the sample response file
+                    # try:
+                    #     from pathlib import Path
+
+                    #     # Create the directory if it doesn't exist
+                    #     sample_dir = Path.cwd() / "docs" / "sample_backend_responses"
+                    #     sample_dir.mkdir(parents=True, exist_ok=True)
+
+                    #     # Write the response to the file
+                    #     sample_file = sample_dir / "sample_ansari_llm_response.txt"
+                    #     with open(sample_file, "w", encoding="utf-8") as f:
+                    #         f.write(full_response)
+                    #     logger.info(f"Saved backend response to {sample_file}")
+                    # except Exception as e:
+                    #     logger.warning(f"Failed to save sample response: {e}")
+                    # # END TEMPORARY CODE
 
                     return full_response
         except httpx.TimeoutException as e:

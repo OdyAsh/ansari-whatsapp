@@ -43,23 +43,6 @@ class AnsariClientBase(ABC):
         pass
 
     @abstractmethod
-    async def update_user_location(self, phone_num: str, latitude: float, longitude: float) -> dict:
-        """Update a WhatsApp user's location in the Ansari backend.
-
-        Args:
-            phone_num (str): The user's WhatsApp phone number.
-            latitude (float): The latitude of the user's location.
-            longitude (float): The longitude of the user's location.
-
-        Returns:
-            dict: The update result.
-
-        Raises:
-            UserLocationUpdateError: If the update fails.
-        """
-        pass
-
-    @abstractmethod
     async def create_thread(self, phone_num: str, title: str) -> dict:
         """Create a new thread for a WhatsApp user in the Ansari backend.
 

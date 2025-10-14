@@ -17,11 +17,6 @@ class UserExistsCheckError(AnsariClientError):
     pass
 
 
-class UserLocationUpdateError(AnsariClientError):
-    """Updating user location failed."""
-    pass
-
-
 class ThreadCreationError(AnsariClientError):
     """Thread creation failed."""
     pass

@@ -38,14 +38,6 @@ def get_logger(name: str):
     # Get settings
     settings = get_settings()
 
-    # Use file name only for local deployment, as it can be ctrl+clicked by VSCode
-    #   E.g.: whatsapp_presenter:56
-    if settings.DEPLOYMENT_TYPE == "local":
-        name_format = "{file}"
-    else:
-        # Use full module name for non-local deployments
-        #   E.g.: ansari_whatsapp.utils.whatsapp_logger:56
-        name_format = "{name}"
 
     # Combined filter for all handlers
     def log_filter(record):
@@ -76,7 +68,7 @@ def get_logger(name: str):
         format=(
             "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
             "<level>{level: <4}</level> | "
-            f"<cyan>{name_format}</cyan>:<cyan>{{line}}</cyan> "
+            "<cyan>{file}</cyan>:<cyan>{{line}}</cyan> "
             "<blue>[{function}()]</blue> | "
             "<level>{message}</level>"
         ),
@@ -89,7 +81,7 @@ def get_logger(name: str):
         catch=False,
     )
 
-    # Add file logging for test files (when enabled)
+    # Write logs to files as well (IF we're running locally)
     if settings.DEPLOYMENT_TYPE == "local":
         # Define log file path for this specific module
         log_dir = os.path.join(os.getcwd(), "logs")

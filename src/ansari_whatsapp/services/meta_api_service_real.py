@@ -3,11 +3,10 @@
 
 import httpx
 
-from ansari_whatsapp.utils.whatsapp_logger import get_logger
+from loguru import logger
+
 from ansari_whatsapp.utils.config import get_settings
 from ansari_whatsapp.services.meta_api_service_base import MetaApiServiceBase
-
-logger = get_logger(__name__)
 
 
 class MetaApiServiceReal(MetaApiServiceBase):

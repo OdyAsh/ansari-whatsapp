@@ -5,7 +5,8 @@ import asyncio
 import time
 from datetime import datetime, timezone
 
-from ansari_whatsapp.utils.whatsapp_logger import get_logger
+from loguru import logger
+
 from ansari_whatsapp.services.service_provider import get_ansari_client
 from ansari_whatsapp.services.meta_service_provider import get_meta_api_service
 from ansari_whatsapp.utils.exceptions import (
@@ -19,8 +20,6 @@ from ansari_whatsapp.utils.language_utils import get_language_from_text
 from ansari_whatsapp.utils.time_utils import calculate_time_passed, get_retention_time_seconds
 from ansari_whatsapp.presenters.whatsapp_message_formatter import format_for_whatsapp
 from ansari_whatsapp.utils.whatsapp_message_splitter import split_message
-
-logger = get_logger(__name__)
 
 
 class WhatsAppConversationManager:

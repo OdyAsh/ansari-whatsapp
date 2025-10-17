@@ -1,13 +1,12 @@
 # Service Provider for ansari-whatsapp
 """Factory function for providing the appropriate Ansari client implementation."""
 
+from loguru import logger
+
 from ansari_whatsapp.utils.config import get_settings
-from ansari_whatsapp.utils.whatsapp_logger import get_logger
 from ansari_whatsapp.services.ansari_client_base import AnsariClientBase
 from ansari_whatsapp.services.ansari_client_real import AnsariClientReal
 from ansari_whatsapp.services.ansari_client_mock import AnsariClientMock
-
-logger = get_logger(__name__)
 
 
 def get_ansari_client() -> AnsariClientBase:

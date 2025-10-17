@@ -3,10 +3,9 @@
 
 from datetime import datetime, timezone
 
-from ansari_whatsapp.utils.whatsapp_logger import get_logger
-from ansari_whatsapp.utils.config import get_settings
+from loguru import logger
 
-logger = get_logger(__name__)
+from ansari_whatsapp.utils.config import get_settings
 
 
 def format_time_delta(seconds: float) -> str:

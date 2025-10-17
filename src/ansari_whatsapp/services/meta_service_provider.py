@@ -1,13 +1,12 @@
 # Service Provider for Meta WhatsApp API services
 """Factory function for providing the appropriate Meta API service implementation."""
 
+from loguru import logger
+
 from ansari_whatsapp.utils.config import get_settings
-from ansari_whatsapp.utils.whatsapp_logger import get_logger
 from ansari_whatsapp.services.meta_api_service_base import MetaApiServiceBase
 from ansari_whatsapp.services.meta_api_service_real import MetaApiServiceReal
 from ansari_whatsapp.services.meta_api_service_mock import MetaApiServiceMock
-
-logger = get_logger(__name__)
 
 
 def get_meta_api_service() -> MetaApiServiceBase:

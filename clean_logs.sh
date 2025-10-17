@@ -5,8 +5,6 @@
 # NOTE: to run in powershell, you have to prefix with `sh `
 # E.g.: `sh ./logs/clean_logs.sh 5`
 
-# TODO(odyash) soon: move this file to root dir., and in log branch, commit it
-
 # Default to 0 minutes if no argument is provided
 MINUTES=${1:-0}
 

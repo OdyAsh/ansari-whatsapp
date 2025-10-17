@@ -21,7 +21,7 @@ from ansari_whatsapp.utils.whatsapp_webhook_parser import parse_webhook_payload
 from ansari_whatsapp.utils.time_utils import is_message_too_old
 from ansari_whatsapp.utils.config import get_settings
 from ansari_whatsapp.utils.general_helpers import CORSMiddlewareWithLogging
-from ansari_whatsapp.utils.whatsapp_logger import configure_logger
+from ansari_whatsapp.utils.app_logger import configure_logger
 
 # Configure logger at module load time
 # This ensures logger is configured whether the app is run via:

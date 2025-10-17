@@ -14,15 +14,24 @@ https://www.perplexity.ai/search/explain-fastapi-s-backgroundta-rnpU7D19QpSxp2ZO
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.responses import HTMLResponse, Response, JSONResponse
 
+from loguru import logger
+
 from ansari_whatsapp.services.whatsapp_conversation_manager import WhatsAppConversationManager
 from ansari_whatsapp.utils.whatsapp_webhook_parser import parse_webhook_payload
 from ansari_whatsapp.utils.time_utils import is_message_too_old
-from ansari_whatsapp.utils.whatsapp_logger import get_logger
 from ansari_whatsapp.utils.config import get_settings
 from ansari_whatsapp.utils.general_helpers import CORSMiddlewareWithLogging
+from ansari_whatsapp.utils.whatsapp_logger import configure_logger
 
-logger = get_logger(__name__)
-
+# Configure logger at module load time
+# This ensures logger is configured whether the app is run via:
+# 1. Direct execution: python src/ansari_whatsapp/app/main.py
+# 2. Uvicorn command: uvicorn src.ansari_whatsapp.app.main:app --reload
+#
+# Note: Configuring once is sufficient as loguru's logger is a global singleton.
+# Any module that imports `from loguru import logger` will use the configured instance.
+# See: https://github.com/Delgan/loguru/issues/54#issuecomment-461724397
+configure_logger()
 
 # Helper function for webhook responses
 def create_webhook_response(
@@ -78,69 +87,8 @@ def create_webhook_response(
         status_code=200
     )
 
-# TODO NOW: test , if no httpx.readtimeout occurs, then understand async def process_message(request: MessageProcessing)
-#   and check other TODO NOWs
 
 
-# TODO NOW OLD: see why ansari prod. responds when sending msg to ansari test (i think bec. we no add !d ?)
-#   Done: We need to apply is_target_business_number in prod environment. Otherwise, sending any message in local/staging/prod
-#   will also send it to rest of platforms
-# TODO NOW OLD: see why ansari-backend (local) responds, but msg isn't recevied by ansari-whatsapp local
-#   (i gues bec. ansari-backend is not in origins list?)
-# e.g of error:
-r"""
-Traceback (most recent call last):
-
-  File "D:\CS\projects\ansari\ansari-whatsapp\src\ansari_whatsapp\utils\ansari_client.py", line 164, in process_message
-    response = await client.post(
-                     │      └ <function AsyncClient.post at 0x000001602D0EF740>
-                     └ <httpx.AsyncClient object at 0x000001602E912B10>
-
-  File "D:\CS\projects\ansari\ansari-whatsapp\.venv\Lib\site-packages\httpx\_client.py", line 1859, in post
-    return await self.request(
-                 │    └ <function AsyncClient.request at 0x000001602D0EF100>
-                 └ <httpx.AsyncClient object at 0x000001602E912B10>
-  File "D:\CS\projects\ansari\ansari-whatsapp\.venv\Lib\site-packages\httpx\_client.py", line 1540, in request
-    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
-                 │    │    │             │                      └ <httpx._client.UseClientDefault object at 0x000001602D0697F0>
-                 │    │    │             └ <httpx._client.UseClientDefault object at 0x000001602D0697F0>
-                 │    │    └ <Request('POST', 'http://localhost:8000/api/v2/whatsapp/messages/process')>
-                 │    └ <function AsyncClient.send at 0x000001602D0EF2E0>
-                 └ <httpx.AsyncClient object at 0x000001602E912B10>
-  File "D:\CS\projects\ansari\ansari-whatsapp\.venv\Lib\site-packages\httpx\_client.py", line 1629, in send
-    response = await self._send_handling_auth(
-                     │    └ <function AsyncClient._send_handling_auth at 0x000001602D0EF380>
-                     └ <httpx.AsyncClient object at 0x000001602E912B10>
-  File "D:\CS\projects\ansari\ansari-whatsapp\.venv\Lib\site-packages\httpx\_client.py", line 1657, in _send_handling_auth
-    response = await self._send_handling_redirects(
-                     │    └ <function AsyncClient._send_handling_redirects at 0x000001602D0EF420>
-                     └ <httpx.AsyncClient object at 0x000001602E912B10>
-  File "D:\CS\projects\ansari\ansari-whatsapp\.venv\Lib\site-packages\httpx\_client.py", line 1694, in _send_handling_redirects
-    response = await self._send_single_request(request)
-                     │    │                    └ <Request('POST', 'http://localhost:8000/api/v2/whatsapp/messages/process')>
-                     │    └ <function AsyncClient._send_single_request at 0x000001602D0EF4C0>
-                     └ <httpx.AsyncClient object at 0x000001602E912B10>
-  File "D:\CS\projects\ansari\ansari-whatsapp\.venv\Lib\site-packages\httpx\_client.py", line 1730, in _send_single_request
-    response = await transport.handle_async_request(request)
-                     │         │                    └ <Request('POST', 'http://localhost:8000/api/v2/whatsapp/messages/process')>
-                     │         └ <function AsyncHTTPTransport.handle_async_request at 0x000001602D0EC040>
-                     └ <httpx.AsyncHTTPTransport object at 0x000001602E913820>
-  File "D:\CS\projects\ansari\ansari-whatsapp\.venv\Lib\site-packages\httpx\_transports\default.py", line 393, in handle_async_request
-    with map_httpcore_exceptions():
-         └ <function map_httpcore_exceptions at 0x000001602D0DB600>
-  File "C:\Users\ashra\AppData\Roaming\uv\python\cpython-3.13.2-windows-x86_64-none\Lib\contextlib.py", line 162, in __exit__
-    self.gen.throw(value)
-    │    │   │     └ ReadTimeout(TimeoutError())
-    │    │   └ <method 'throw' of 'generator' objects>
-    │    └ <generator object map_httpcore_exceptions at 0x000001602E9B4540>
-    └ <contextlib._GeneratorContextManager object at 0x000001602E9A56A0>
-  File "D:\CS\projects\ansari\ansari-whatsapp\.venv\Lib\site-packages\httpx\_transports\default.py", line 118, in map_httpcore_exceptions
-    raise mapped_exc(message) from exc
-          │          └ ''
-          └ <class 'httpx.ReadTimeout'>
-
-httpx.ReadTimeout
-"""
 
 # Create FastAPI application
 app = FastAPI(
@@ -318,7 +266,7 @@ async def main_webhook(request: Request, background_tasks: BackgroundTasks) -> R
             error_code="MAINTENANCE_MODE"
         )
 
-    # Temporarycorner case while locally developing:
+    # Temporary corner case while locally developing:
     #   Since the staging server is always running,
     #   and since we currently have the same testing number for both staging and local testing,
     #   therefore we need an indicator that a message is meant for a dev who's testing locally now
@@ -388,8 +336,8 @@ async def main_webhook(request: Request, background_tasks: BackgroundTasks) -> R
 
 if __name__ == "__main__":
     # This block is executed when the script is run directly
-    # To run with auto-reload on .env file changes, use:
-    # uvicorn src.ansari_whatsapp.app.main:app --reload --reload-include .env
+    # Alternative: Run with uvicorn command for auto-reload on .env file changes:
+    #   uvicorn src.ansari_whatsapp.app.main:app --reload --reload-include .env
     import uvicorn
     import os
 

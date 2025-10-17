@@ -1,10 +1,10 @@
 # WhatsApp Webhook Parser
 """Utilities for parsing WhatsApp webhook payloads from Meta API."""
 
-from ansari_whatsapp.utils.whatsapp_logger import get_logger
+from loguru import logger
+
 from ansari_whatsapp.utils.config import get_settings
 
-logger = get_logger(__name__)
 settings = get_settings()
 
 

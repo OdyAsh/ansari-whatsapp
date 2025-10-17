@@ -7,7 +7,8 @@ from datetime import datetime, timezone
 from functools import wraps
 from typing import Callable
 
-from ansari_whatsapp.utils.whatsapp_logger import get_logger
+from loguru import logger
+
 from ansari_whatsapp.utils.config import get_settings
 from ansari_whatsapp.utils.exceptions import (
     UserRegistrationError,
@@ -18,8 +19,6 @@ from ansari_whatsapp.utils.exceptions import (
     MessageProcessingError,
 )
 from ansari_whatsapp.services.ansari_client_base import AnsariClientBase
-
-logger = get_logger(__name__)
 
 
 def simulate_backend_behavior(

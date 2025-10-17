@@ -3,10 +3,9 @@
 
 import asyncio
 
-from ansari_whatsapp.utils.whatsapp_logger import get_logger
-from ansari_whatsapp.services.meta_api_service_base import MetaApiServiceBase
+from loguru import logger
 
-logger = get_logger(__name__)
+from ansari_whatsapp.services.meta_api_service_base import MetaApiServiceBase
 
 
 class MetaApiServiceMock(MetaApiServiceBase):

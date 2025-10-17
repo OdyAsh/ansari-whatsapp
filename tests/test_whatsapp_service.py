@@ -27,7 +27,7 @@ from typing import Any
 from fastapi.testclient import TestClient
 
 from ansari_whatsapp.app.main import app
-from ansari_whatsapp.utils.whatsapp_logger import get_logger
+from ansari_whatsapp.utils.app_logger import get_logger
 from ansari_whatsapp.utils.config import get_settings
 from .test_utils import (
     secure_log_result,

@@ -58,7 +58,7 @@ set ALWAYS_RETURN_OK_TO_META=False && pytest tests/ -v
 **NOTE:** WhatsApp API endpoint tests have been moved to `ansari-backend/tests/unit/test_whatsapp_api_endpoints.py` since they test backend endpoints, not WhatsApp webhook endpoints. This allows them to use TestClient without external server dependencies.
 
 ### Streaming Endpoint Testing
-The `/api/v2/whatsapp/messages/process` endpoint streams responses. Tests should:
+The `/whatsapp/v2/messages/process` endpoint streams responses. Tests should:
 - Collect the **complete** streaming response (not just first chunk)
 - Validate streaming performance, timing, and content
 - Test timeout scenarios and error handling

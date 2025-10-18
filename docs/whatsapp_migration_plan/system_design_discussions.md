@@ -124,7 +124,7 @@ footnote [3]: I actually have no idea how to do step (5.) above, as Amr Masha'Al
 
 ## Waleed
 
-Your plan seems largely aligned, but I think the way you should think about it is as a wrapper around the Ansari v2 api. My understanding is that you don’t really register accounts from whatsapp. So there are two options: (1) is to use the v1 style APIs which are much more stateless: conv history in, completion out. Then you store the results in your own database. I think this could simplify things a lot for you (2) register guest accounts. I don’t think we need an auth flow. As long as you keep the user id from the guest account, you can preserve the history of the conversation.
+Your plan seems largely aligned, but I think the way you should think about it is as a wrapper around the Ansari v2 api. My understanding is that you don’t really register accounts from whatsapp. So there are two options: (1) is to use the v2 style APIs which are much more stateless: conv history in, completion out. Then you store the results in your own database. I think this could simplify things a lot for you (2) register guest accounts. I don’t think we need an auth flow. As long as you keep the user id from the guest account, you can preserve the history of the conversation.
 
 
 ## Ashraf

@@ -7,7 +7,7 @@ This directory contains integration tests for the WhatsApp microservice, focusin
 **WhatsApp API endpoint tests have been moved to `ansari-backend/tests/unit/test_whatsapp_api_endpoints.py`**
 
 ### Reason for Move:
-- The WhatsApp API endpoints (like `/api/v2/whatsapp/users/register`) are **implemented in ansari-backend**
+- The WhatsApp API endpoints (like `/whatsapp/v2/users/register`) are **implemented in ansari-backend**
 - Tests should live with the code they test
 - Moving them allows use of **TestClient** instead of external HTTP calls
 - **No external server dependencies** needed for CI/CD
@@ -50,8 +50,8 @@ Secure logging and testing utilities:
 
 #### WhatsApp Service Tests (This Repo)
 ```bash
-# All WhatsApp service tests (local development)
-pytest tests/test_whatsapp_service.py -v
+# All WhatsApp service tests (local development) (the `-s` flag shows print/log statements)
+pytest tests/test_whatsapp_service.py -v -s
 
 # With test-only logging (filters out non-test logs)
 LOG_TEST_FILES_ONLY=True pytest tests/test_whatsapp_service.py -v -s

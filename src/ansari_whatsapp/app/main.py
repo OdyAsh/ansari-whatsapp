@@ -13,7 +13,6 @@ https://www.perplexity.ai/search/explain-fastapi-s-backgroundta-rnpU7D19QpSxp2ZO
 
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.responses import HTMLResponse, Response, JSONResponse
-
 from loguru import logger
 
 from ansari_whatsapp.services.whatsapp_conversation_manager import WhatsAppConversationManager
@@ -113,7 +112,7 @@ async def root():
     return {"status": "ok", "message": "Ansari WhatsApp service is running"}
 
 
-@app.get("/whatsapp/v1")
+@app.get("/whatsapp/v2")
 async def verification_webhook(request: Request) -> str | None:
     """
     Handles the WhatsApp webhook verification request.
@@ -140,7 +139,7 @@ async def verification_webhook(request: Request) -> str | None:
     raise HTTPException(status_code=400, detail="Bad Request")
 
 
-@app.post("/whatsapp/v1")
+@app.post("/whatsapp/v2")
 async def main_webhook(request: Request, background_tasks: BackgroundTasks) -> Response:
     """
     Handles the incoming WhatsApp webhook message from Meta's WhatsApp Business API.

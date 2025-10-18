@@ -55,7 +55,7 @@ def configure_logger():
         format=(
             "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
             "<level>{level: <4}</level> | "
-            "<cyan>{file}</cyan>:<cyan>{{line}}</cyan> "
+            "<cyan>{file}</cyan>:<cyan>{line}</cyan> "
             "<blue>[{function}()]</blue> | "
             "<level>{message}</level>"
         ),

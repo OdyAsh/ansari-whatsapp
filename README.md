@@ -76,8 +76,8 @@ docker run -p 8001:8001 --env-file .env ansari-whatsapp
 The service exposes the following endpoints:
 
 - `GET /`: Health check endpoint
-- `GET /whatsapp/v1`: Webhook verification endpoint for WhatsApp
-- `POST /whatsapp/v1`: Main webhook endpoint for receiving WhatsApp messages
+- `GET /whatsapp/v2`: Webhook verification endpoint for WhatsApp
+- `POST /whatsapp/v2`: Main webhook endpoint for receiving WhatsApp messages
 
 ## Architecture
 

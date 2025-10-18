@@ -5,7 +5,7 @@ Based on my analysis of both repositories, here's what I found and what needs to
 ## Current Migration Status
 
 ### ✅ What's Already Migrated to ansari-whatsapp:
-1. **Core webhook endpoints** - Both GET/POST `/whatsapp/v1` endpoints
+1. **Core webhook endpoints** - Both GET/POST `/whatsapp/v2` endpoints
 2. **FastAPI application structure** - Independent FastAPI app with proper CORS middleware
 3. **WhatsApp message extraction logic** - `extract_relevant_whatsapp_message_details()` function
 4. **WhatsApp presenter** - Core message handling logic with typing indicators and markdown formatting
@@ -19,19 +19,19 @@ Based on my analysis of both repositories, here's what I found and what needs to
 ### ✅ Cleaned Up from ansari-backend (Completed):
 1. ✅ **main_whatsapp.py** - Removed (old webhook implementation)
 2. ✅ **whatsapp_presenter.py** - Removed (moved to ansari-whatsapp)
-3. ✅ **Old WhatsApp router** - Replaced with new whatsapp_api_router.py for backend endpoints only
+3. ✅ **Old WhatsApp router** - Replaced with new whatsapp_router.py for backend endpoints only
 4. ✅ **WhatsApp environment variables** - Removed legacy WhatsApp config vars from backend (no longer needed)
 
 ### ✅ Backend API Endpoints (Completed):
 The ansari-whatsapp service communicates with these backend endpoints:
 
-1. ✅ `POST /api/v2/whatsapp/users/register` - Register WhatsApp users
-2. ✅ `GET /api/v2/whatsapp/users/exists` - Check user existence
-3. ✅ ~~`PUT /api/v2/whatsapp/users/location` - Update user location~~ (Removed for privacy)
-4. ✅ `POST /api/v2/whatsapp/threads` - Create new message threads
-5. ✅ `GET /api/v2/whatsapp/threads/last` - Get last thread info
-6. ✅ `GET /api/v2/whatsapp/threads/{thread_id}/history` - Get thread history
-7. ✅ `POST /api/v2/whatsapp/messages/process` - Process messages (with streaming support)
+1. ✅ `POST /whatsapp/v2/users/register` - Register WhatsApp users
+2. ✅ `GET /whatsapp/v2/users/exists` - Check user existence
+3. ✅ ~~`PUT /whatsapp/v2/users/location` - Update user location~~ (Removed for privacy)
+4. ✅ `POST /whatsapp/v2/threads` - Create new message threads
+5. ✅ `GET /whatsapp/v2/threads/last` - Get last thread info
+6. ✅ `GET /whatsapp/v2/threads/{thread_id}/history` - Get thread history
+7. ✅ `POST /whatsapp/v2/messages/process` - Process messages (with streaming support)
 
 ### 🔧 What Needs Enhancement in ansari-whatsapp:
 1. **Message too old logic** - Currently commented out in main.py:218
@@ -41,7 +41,7 @@ The ansari-whatsapp service communicates with these backend endpoints:
 ## Migration Plan
 
 ### ✅ Phase 1: Create Missing Backend API Endpoints (COMPLETED)
-- ✅ Create `whatsapp_api_router.py` in ansari-backend
+- ✅ Create `whatsapp_router.py` in ansari-backend
 - ✅ Implement all 7 API endpoints with proper database integration
 - ✅ Add streaming support for message processing endpoint
 - ✅ Include router in main_api.py

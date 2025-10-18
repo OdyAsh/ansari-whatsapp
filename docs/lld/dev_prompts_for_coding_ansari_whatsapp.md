@@ -78,7 +78,7 @@ what I have in mind: if a new phone num. sends a message, we first return "will 
 
 ```
 senior:
-Your plan seems largely aligned, but I think the way you should think about it is as a wrapper around the Ansari v2 api. My understanding is that you don't really register accounts from whatsapp. So there are two options: (1) is to use the v1 style APIs which are much more stateless: conv history in, completion out. Then you store the results in your own database. I think this could simplify things a lot for you (2) register guest accounts. I don't think we need an auth flow. As long as you keep the user id from the guest account, you can preserve the history of the conversation.
+Your plan seems largely aligned, but I think the way you should think about it is as a wrapper around the Ansari v2 api. My understanding is that you don't really register accounts from whatsapp. So there are two options: (1) is to use the v2 style APIs which are much more stateless: conv history in, completion out. Then you store the results in your own database. I think this could simplify things a lot for you (2) register guest accounts. I don't think we need an auth flow. As long as you keep the user id from the guest account, you can preserve the history of the conversation.
 ```
 
 ## Message 2
@@ -89,7 +89,7 @@ stop waiting for output from shell: start main api task; just continue your flow
 
 great, few tweaks:
 
-1. see the implementation of #sym:process_message ? it has a TO-DO , now replace the response_text placeholder currently implemented with the following: create an ansari agent at the top of the #file:whatsapp_api_router.py   file (similar to what's done in #file:main_api.py  ) , then use the agent logic found in #sym:handle_text_message   to complete TO-DO code. (however, i''m not sure if this is the optimal solution or not, so think for yourself as well)
+1. see the implementation of #sym:process_message ? it has a TO-DO , now replace the response_text placeholder currently implemented with the following: create an ansari agent at the top of the #file:whatsapp_router.py   file (similar to what's done in #file:main_api.py  ) , then use the agent logic found in #sym:handle_text_message   to complete TO-DO code. (however, i''m not sure if this is the optimal solution or not, so think for yourself as well)
 
 2. try to make the implementation of #file:whatsapp_logger.py  similar to that of #file:ansari_logger.py (e..g., use rich library, etc)
 
@@ -233,11 +233,11 @@ in here #file:config.py:1-130 , i notice that i need to restart vscode's termina
 
 ## Message 1
 
-See the implementation of #sym:AnsariClient  and this file? #file:whatsapp_api_router.py 
+See the implementation of #sym:AnsariClient  and this file? #file:whatsapp_router.py 
 
 Here's the issue: 
 
-The file in whatsapp_api_router takes a long time to respond to AnsariClient, so i need a way for whatsapp_api_router to say to AnsariClient "processing" so that no httpcore.ReadTimeout occurs. How to do that? (i.e., send any form of communication to show that connection is still alive) 
+The file in whatsapp_router takes a long time to respond to AnsariClient, so i need a way for whatsapp_router to say to AnsariClient "processing" so that no httpcore.ReadTimeout occurs. How to do that? (i.e., send any form of communication to show that connection is still alive) 
 
 (Note: I know i can just increase the read timeout of AnsariClient like what's mentioned here: #fetch : https://www.python-httpx.org/advanced/timeouts/#:~:text=HTTPX%20is%20careful%20to%20enforce,5%20seconds%20of%20network%20inactivity. , but i don't want to do that)
 

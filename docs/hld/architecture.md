@@ -96,7 +96,7 @@ The WhatsApp service is built as a FastAPI application with the following key co
 
 The backend service exposes dedicated API endpoints for the WhatsApp service:
 
-- **whatsapp_api_router.py**: Provides endpoints specifically for WhatsApp service integration
+- **whatsapp_router.py**: Provides endpoints specifically for WhatsApp service integration
 - **Database Integration**: Handles storage and retrieval of WhatsApp messages, threads, and user data
 - **Ansari Agent**: Processes messages using LLM and generates responses
 
@@ -140,18 +140,18 @@ sequenceDiagram
 
 ### ansari-whatsapp Endpoints
 
-- **GET /whatsapp/v1**: WhatsApp webhook verification endpoint
-- **POST /whatsapp/v1**: Main webhook endpoint for receiving WhatsApp messages
+- **GET /whatsapp/v2**: WhatsApp webhook verification endpoint
+- **POST /whatsapp/v2**: Main webhook endpoint for receiving WhatsApp messages
 
 ### ansari-backend WhatsApp API Endpoints
 
-- **POST /api/v2/whatsapp/users/register**: Register a new WhatsApp user
-- **GET /api/v2/whatsapp/users/exists**: Check if a WhatsApp user exists
-- **PUT /api/v2/whatsapp/users/location**: Update a user's location
-- **POST /api/v2/whatsapp/threads**: Create a new message thread
-- **GET /api/v2/whatsapp/threads/last**: Get information about the last active thread
-- **GET /api/v2/whatsapp/threads/{thread_id}/history**: Get thread message history
-- **POST /api/v2/whatsapp/messages/process**: Process a message and generate a response
+- **POST /whatsapp/v2/users/register**: Register a new WhatsApp user
+- **GET /whatsapp/v2/users/exists**: Check if a WhatsApp user exists
+- **PUT /whatsapp/v2/users/location**: Update a user's location
+- **POST /whatsapp/v2/threads**: Create a new message thread
+- **GET /whatsapp/v2/threads/last**: Get information about the last active thread
+- **GET /whatsapp/v2/threads/{thread_id}/history**: Get thread message history
+- **POST /whatsapp/v2/messages/process**: Process a message and generate a response
 
 ## Data Model
 

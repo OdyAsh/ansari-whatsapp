@@ -36,8 +36,12 @@ Secure logging and testing utilities:
    ```env
    META_WEBHOOK_VERIFY_TOKEN=your_verify_token
    META_BUSINESS_PHONE_NUMBER_ID=your_phone_number_id
-   ALWAYS_RETURN_OK_TO_META=True  # Set to False for CI/CD
-   LOG_TEST_FILES_ONLY=False      # Set to True to filter test logs
+   WHATSAPP_DEV_PHONE_NUM=+1234567890  # For webhook message testing
+   WHATSAPP_DEV_MESSAGE_ID=wamid.xxx   # For webhook message testing
+   MOCK_ANSARI_CLIENT=True             # Set to False to use real backend
+   BACKEND_SERVER_URL=http://localhost:8000  # Required if MOCK_ANSARI_CLIENT=False
+   ALWAYS_RETURN_OK_TO_META=True       # Set to False for CI/CD
+   LOG_TEST_FILES_ONLY=False           # Set to True to filter test logs
    ```
 
 2. **Install Dependencies**:
@@ -45,6 +49,12 @@ Secure logging and testing utilities:
    cd ansari-whatsapp
    uv add pytest
    ```
+
+3. **Backend Availability**:
+   - **Mock Mode (MOCK_ANSARI_CLIENT=True)**: No backend needed, tests use mock client
+   - **Real Backend (MOCK_ANSARI_CLIENT=False)**: Backend must be running on `BACKEND_SERVER_URL`
+
+   **Important**: If `MOCK_ANSARI_CLIENT=False` and backend is not available, tests will terminate with error instructions.
 
 ### Running Tests
 
@@ -87,6 +97,34 @@ pytest tests/unit/test_whatsapp_api_endpoints.py -m streaming -v
 - **Sensitive Data Masking**: All tokens, phone numbers, and secrets are masked in logs
 - **Environment Variables**: No hardcoded secrets in code
 - **Secure Logging**: `test_utils.py` provides secure logging utilities
+
+## ⚠️ Error Handling & Troubleshooting
+
+### Backend Not Available Error
+If you see this error, it means `MOCK_ANSARI_CLIENT=False` but the backend is not reachable:
+```
+BACKEND IS NOT AVAILABLE
+The backend server is not reachable, but MOCK_ANSARI_CLIENT is set to False.
+```
+
+**Solutions:**
+1. **Enable mock mode**: Set `MOCK_ANSARI_CLIENT=True` in `.env`
+2. **Fix backend URL**: Verify `BACKEND_SERVER_URL` is correct in `.env`
+3. **Start backend**: Ensure ansari-backend is running on the configured URL
+
+### Missing Environment Variables Error
+If you see this error, required test environment variables are not set:
+```
+ERROR CREATING TEST PAYLOAD
+This usually means required environment variables are not set.
+```
+
+**Required variables:**
+- `META_BUSINESS_PHONE_NUMBER_ID`: Your Meta business phone number ID
+- `WHATSAPP_DEV_PHONE_NUM`: A valid WhatsApp phone number for testing (e.g., `+1234567890`)
+- `WHATSAPP_DEV_MESSAGE_ID`: A valid message ID for testing (e.g., `wamid.xxx`)
+
+**Solution:** Check your `.env` file and ensure all required variables are set. See `.env.example` for examples.
 
 ## 🛠 GitHub Actions Ready
 

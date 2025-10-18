@@ -112,6 +112,35 @@ The Ansari backend should expose endpoints specifically for WhatsApp integration
 | WHATSAPP_CHAT_RETENTION_HOURS | Hours to retain chat history | 3 |
 | DEV_MODE | Enable development mode | false |
 
+## Testing
+
+### Running Tests
+
+The project includes comprehensive integration tests for WhatsApp webhook endpoints.
+
+```bash
+# Run all tests with detailed output
+pytest tests/ -v
+
+# Run with logs displayed
+pytest tests/ -v -s
+
+# Run only integration tests
+pytest tests/ -m integration -v
+```
+
+### Test Configuration
+
+Tests require environment variables to be configured. Key settings:
+
+- **MOCK_ANSARI_CLIENT**: Set to `True` to use mock client (no backend needed), `False` to use real backend
+- **BACKEND_SERVER_URL**: URL of the backend service (required if `MOCK_ANSARI_CLIENT=False`)
+- **Test-specific variables**: `WHATSAPP_DEV_PHONE_NUM`, `WHATSAPP_DEV_MESSAGE_ID`, etc.
+
+**Important**: If `MOCK_ANSARI_CLIENT=False` and the backend is not available, tests will fail with clear instructions on how to fix the issue.
+
+See `tests/README.md` for detailed testing documentation and troubleshooting.
+
 ## Troubleshooting
 
 Logs are stored in the `logs/` directory. Check these logs for any errors or issues.
@@ -120,3 +149,4 @@ Common issues:
 - WhatsApp API connection problems
 - Missing or invalid environment variables
 - Connection issues with the Ansari backend
+- Test failures due to backend availability (see `tests/README.md` for solutions)

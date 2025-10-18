@@ -32,6 +32,24 @@ This is the `ansari-whatsapp` microservice that handles WhatsApp webhook request
   - `pytest tests/ -v -s` → all logs from all files to console
   - `LOG_TEST_FILES_ONLY=True pytest tests/ -v -s` → only test file logs to console + `logs/test_run.log`
 
+**Backend Availability Requirements:**
+The test suite checks if the ansari-backend is available based on `MOCK_ANSARI_CLIENT` setting:
+- If `MOCK_ANSARI_CLIENT=True`: Tests use mock client (no backend needed)
+- If `MOCK_ANSARI_CLIENT=False`: Tests require backend to be running
+
+If backend is not available and mock mode is disabled, tests will fail with clear error messages explaining:
+- **Option 1:** Set `MOCK_ANSARI_CLIENT=True` in `.env` to use mock mode
+- **Option 2:** Verify `BACKEND_SERVER_URL` is correct in `.env`
+- **Option 3:** Start the ansari-backend service on the configured URL
+
+**Required Test Environment Variables:**
+Tests that simulate WhatsApp webhook messages require:
+- `META_BUSINESS_PHONE_NUMBER_ID`: Your Meta business phone number ID
+- `WHATSAPP_DEV_PHONE_NUM`: A valid WhatsApp phone number for testing
+- `WHATSAPP_DEV_MESSAGE_ID`: A valid message ID for testing
+
+If these are not set, tests will fail with clear instructions. See `.env.example` for details.
+
 **CI/CD Test Commands:**
 When running tests in CI/CD pipelines, set `ALWAYS_RETURN_OK_TO_META=False` to get proper HTTP status codes for test assertions:
 ```bash

@@ -43,7 +43,7 @@ class WhatsAppSettings(BaseSettings):
 
     ########## ansari-backend's settings ##########
 
-    BACKEND_SERVER_URL: SecretStr
+    BACKEND_SERVER_URL: str = "http://localhost:8000"
 
     ########### Meta Business API settings ###########
 

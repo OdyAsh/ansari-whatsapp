@@ -108,7 +108,7 @@ graph TD
 
 #### ansari-backend
 
-- **src/ansari/app/whatsapp_api_router.py**: WhatsApp API endpoints
+- **src/ansari/routers/whatsapp_router.py**: WhatsApp API endpoints
   - Defines routes for WhatsApp-specific operations
   - Handles authentication/validation of WhatsApp service requests
   - Connects to the database and Ansari agent
@@ -156,7 +156,7 @@ sequenceDiagram
     participant DB as Database
     
     WP->>AC: check_user_exists(phone_num)
-    AC->>API: GET /api/v2/whatsapp/users/exists
+    AC->>API: GET /whatsapp/v2/users/exists
     API->>DB: Query user
     DB->>API: User exists: yes/no
     API->>AC: User exists response
@@ -165,7 +165,7 @@ sequenceDiagram
     alt User does not exist
         WP->>WP: Detect language from message
         WP->>AC: register_user(phone_num, language)
-        AC->>API: POST /api/v2/whatsapp/users/register
+        AC->>API: POST /whatsapp/v2/users/register
         API->>DB: Create user record
         DB->>API: User creation result
         API->>AC: Registration response
@@ -227,7 +227,7 @@ The WhatsApp service receives webhook events from the WhatsApp Business API in t
 
 **Request:**
 ```json
-POST /api/v2/whatsapp/users/register
+POST /whatsapp/v2/users/register
 {
   "phone_num": "1234567890",
   "preferred_language": "en"
@@ -246,7 +246,7 @@ POST /api/v2/whatsapp/users/register
 
 **Request:**
 ```json
-POST /api/v2/whatsapp/messages/process
+POST /whatsapp/v2/messages/process
 {
   "phone_num": "1234567890",
   "thread_id": "thread_uuid_here",
@@ -277,7 +277,7 @@ No additional WhatsApp-specific environment variables are needed in the backend,
 
 1. Check the logs in both services:
    - ansari-whatsapp logs: `logs/{module_name}.log` (dynamically created per module)
-   - ansari-backend logs: `logs/ansari.app.whatsapp_api_router.log`
+   - ansari-backend logs: `logs/ansari.app.whatsapp_router.log`
 
 2. Use the Rich logging interface to see detailed error information with improved tracebacks.
 
@@ -294,7 +294,7 @@ No additional WhatsApp-specific environment variables are needed in the backend,
 To add a new feature to the WhatsApp integration:
 
 1. Determine if the feature requires backend changes
-2. If needed, add new endpoints to `whatsapp_api_router.py` in the backend
+2. If needed, add new endpoints to `whatsapp_router.py` in the backend
 3. Extend the Ansari client in the WhatsApp service to use the new endpoints
 4. Implement the feature logic in the WhatsApp presenter
 5. Test the integration end-to-end
@@ -318,7 +318,7 @@ To support a new type of WhatsApp message (e.g., images, documents):
        return Response(status_code=200)
    ```
 
-3. Implement any required backend support in `whatsapp_api_router.py`.
+3. Implement any required backend support in `whatsapp_router.py`.
 
 ## Deployment Considerations
 

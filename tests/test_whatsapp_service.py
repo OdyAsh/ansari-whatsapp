@@ -24,19 +24,19 @@ import pytest
 import time
 import httpx
 from typing import Any
+
 from fastapi.testclient import TestClient
+# This `logger` will get configured when importing `ansari_whatsapp.app.main` below, 
+# as `main.py` calls `configure_logger()`
+from loguru import logger
 
 from ansari_whatsapp.app.main import app
-from ansari_whatsapp.utils.app_logger import get_logger
 from ansari_whatsapp.utils.config import get_settings
 from .test_utils import (
-    secure_log_result,
+    log_test_result,
     format_payload_for_logging,
     format_params_for_logging
 )
-
-# Initialize logger
-logger = get_logger(__name__)
 
 
 def check_backend_availability() -> bool:
@@ -118,9 +118,9 @@ client = TestClient(app)
 test_results = []
 
 
-def log_test_result(test_name: str, success: bool, message: str, response_data: Any = None):
-    """Log test results with secure data masking."""
-    result = secure_log_result(test_name, success, message, response_data)
+def log_test_result_to_list(test_name: str, success: bool, message: str, response_data: Any = None):
+    """Log test results."""
+    result = log_test_result(test_name, success, message, response_data)
     test_results.append(result)
 
     status = "[PASS]" if success else "[FAIL]"
@@ -139,10 +139,10 @@ def test_whatsapp_health():
     response_data = response.json()
 
     if response.status_code == 200 and response_data.get("status") == "ok":
-        log_test_result(test_name, True, "WhatsApp service is healthy", response_data)
+        log_test_result_to_list(test_name, True, "WhatsApp service is healthy", response_data)
         assert True
     else:
-        log_test_result(test_name, False, f"Health check failed: HTTP {response.status_code}", response_data)
+        log_test_result_to_list(test_name, False, f"Health check failed: HTTP {response.status_code}", response_data)
         assert False
 
 
@@ -158,16 +158,16 @@ def test_webhook_verification(settings):
     }
 
     logger.debug(f"[TEST] Testing {test_name}...")
-    logger.debug("   URL: /whatsapp/v1")
+    logger.debug("   URL: /whatsapp/v2")
     logger.debug(f"   Params: {format_params_for_logging(params)}")
 
-    response = client.get("/whatsapp/v1", params=params)
+    response = client.get("/whatsapp/v2", params=params)
 
     if response.status_code == 200 and "test_challenge_12345" in response.text:
-        log_test_result(test_name, True, "Webhook verification successful", {"response": response.text})
+        log_test_result_to_list(test_name, True, "Webhook verification successful", {"response": response.text})
         assert True
     else:
-        log_test_result(test_name, False, f"Webhook verification failed: HTTP {response.status_code}", 
+        log_test_result_to_list(test_name, False, f"Webhook verification failed: HTTP {response.status_code}", 
                         {"response": response.text})
         assert False
 
@@ -211,11 +211,11 @@ def test_webhook_message_basic(settings):
     }
 
     logger.debug(f"[TEST] Testing {test_name}...")
-    logger.debug("   URL: /whatsapp/v1")
+    logger.debug("   URL: /whatsapp/v2")
     logger.debug(f"   Payload: {format_payload_for_logging(payload)}")
     logger.debug(f"   Mock mode: {settings.MOCK_ANSARI_CLIENT}")
 
-    response = client.post("/whatsapp/v1", json=payload)
+    response = client.post("/whatsapp/v2", json=payload)
 
     # With mock client, we should always get 200
     if response.status_code == 200:
@@ -225,15 +225,15 @@ def test_webhook_message_basic(settings):
             message = response_data.get("message", "")
 
             if success and "processed successfully" in message.lower():
-                log_test_result(test_name, True, "Webhook message processed successfully", response_data)
+                log_test_result_to_list(test_name, True, "Webhook message processed successfully", response_data)
                 logger.debug("   [PASS] Message processed successfully")
             else:
-                log_test_result(test_name, True, "Webhook message accepted", response_data)
+                log_test_result_to_list(test_name, True, "Webhook message accepted", response_data)
                 logger.debug("   [PASS] Message accepted")
 
             assert True
         except json.JSONDecodeError:
-            log_test_result(test_name, True, "Webhook message accepted", {"status_code": response.status_code})
+            log_test_result_to_list(test_name, True, "Webhook message accepted", {"status_code": response.status_code})
             assert True
     else:
         # Non-200 status codes are now considered failures since mock client should handle everything
@@ -242,7 +242,7 @@ def test_webhook_message_basic(settings):
             response_data = response.json()
         except Exception:
             response_data = response.text
-        log_test_result(test_name, False, f"Expected 200, got {response.status_code}.", response_data)
+        log_test_result_to_list(test_name, False, f"Expected 200, got {response.status_code}.", response_data)
         assert False, f"Expected HTTP 200 with mock client, got {response.status_code}"
 
 

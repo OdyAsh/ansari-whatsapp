@@ -42,7 +42,7 @@ class AnsariClientReal(AnsariClientBase):
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"{self.base_url}/api/v2/whatsapp/users/register",
+                    f"{self.base_url}/whatsapp/v2/users/register",
                     json={
                         "phone_num": phone_num,
                         "preferred_language": preferred_language,
@@ -73,7 +73,7 @@ class AnsariClientReal(AnsariClientBase):
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{self.base_url}/api/v2/whatsapp/users/exists",
+                    f"{self.base_url}/whatsapp/v2/users/exists",
                     params={"phone_num": phone_num},
                 )
                 response.raise_for_status()
@@ -102,7 +102,7 @@ class AnsariClientReal(AnsariClientBase):
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"{self.base_url}/api/v2/whatsapp/threads",
+                    f"{self.base_url}/whatsapp/v2/threads",
                     json={"phone_num": phone_num, "title": title},
                 )
                 response.raise_for_status()
@@ -131,7 +131,7 @@ class AnsariClientReal(AnsariClientBase):
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{self.base_url}/api/v2/whatsapp/threads/{thread_id}/history",
+                    f"{self.base_url}/whatsapp/v2/threads/{thread_id}/history",
                     params={"phone_num": phone_num},
                 )
                 response.raise_for_status()
@@ -159,7 +159,7 @@ class AnsariClientReal(AnsariClientBase):
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{self.base_url}/api/v2/whatsapp/threads/last",
+                    f"{self.base_url}/whatsapp/v2/threads/last",
                     params={"phone_num": phone_num},
                 )
                 response.raise_for_status()
@@ -189,7 +189,7 @@ class AnsariClientReal(AnsariClientBase):
         """
         try:
             async with httpx.AsyncClient() as client:
-                url = f"{self.base_url}/api/v2/whatsapp/messages/process"
+                url = f"{self.base_url}/whatsapp/v2/messages/process"
                 data = {
                     "phone_num": phone_num,
                     "thread_id": thread_id,

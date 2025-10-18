@@ -64,8 +64,8 @@ src/ansari_whatsapp/
 
 **FastAPI Application** (`app/main.py:89-261`):
 - Health check endpoint: `GET /`
-- Webhook verification: `GET /whatsapp/v1`
-- Message processing: `POST /whatsapp/v1`
+- Webhook verification: `GET /whatsapp/v2`
+- Message processing: `POST /whatsapp/v2`
 - Uses BackgroundTasks for async message processing to prevent WhatsApp timeouts
 
 **WhatsApp Presenter** (`presenters/whatsapp_presenter.py`):
@@ -87,11 +87,11 @@ src/ansari_whatsapp/
 ### Integration Points
 
 The service acts as a bridge between WhatsApp Business API and the Ansari backend:
-1. Receives webhooks from WhatsApp at `/whatsapp/v1`
+1. Receives webhooks from WhatsApp at `/whatsapp/v2`
 2. Validates and processes incoming messages
 3. Makes API calls to Ansari backend endpoints:
-   - `/api/v2/whatsapp/users/register` - User registration
-   - `/api/v2/whatsapp/messages/process` - Message processing
+   - `/whatsapp/v2/users/register` - User registration
+   - `/whatsapp/v2/messages/process` - Message processing
 4. Sends responses back to WhatsApp users via Graph API
 
 ### Environment Configuration

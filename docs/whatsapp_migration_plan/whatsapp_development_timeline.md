@@ -98,7 +98,7 @@ return Response(status_code=200)  # Always return 200 immediately
 **Challenge**: WhatsApp doesn't follow traditional email/password auth
 
 **Waleed's Recommendation:**
-- **Option 1**: Use stateless v1 APIs (conversation history in, completion out)
+- **Option 1**: Use stateless v2 APIs (conversation history in, completion out)
 - **Option 2**: Register guest accounts without authentication flow
 - **Preferred Approach**: Guest account registration with preserved user ID for conversation history
 

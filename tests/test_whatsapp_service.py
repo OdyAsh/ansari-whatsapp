@@ -11,9 +11,18 @@ Tests verify:
 - Webhook message processing
 - Phone number validation logic
 
-The test suite automatically detects if the backend is available:
-- If backend is running: Tests run with real backend (MOCK_ANSARI_CLIENT=False)
-- If backend is not available: Tests run with mock client (MOCK_ANSARI_CLIENT=True)
+Backend Availability:
+- If MOCK_ANSARI_CLIENT=True: Tests use mock client (no backend needed)
+- If MOCK_ANSARI_CLIENT=False: Tests check backend availability
+  - If backend is available: Tests proceed with real backend
+  - If backend is NOT available: Tests terminate with error instructions
+
+Required Environment Variables:
+- META_BUSINESS_PHONE_NUMBER_ID: Your Meta business phone number ID
+- WHATSAPP_DEV_PHONE_NUM: A valid WhatsApp phone number for testing
+- WHATSAPP_DEV_MESSAGE_ID: A valid message ID for testing
+- MOCK_ANSARI_CLIENT: True for mock mode, False for real backend
+- BACKEND_SERVER_URL: URL of backend service (required if MOCK_ANSARI_CLIENT=False)
 
 Security: All sensitive data is loaded from environment variables and masked in logs.
 """
@@ -66,46 +75,63 @@ def check_backend_availability() -> bool:
 def configure_mock_mode():
     """Configure mock mode based on backend availability before running tests.
 
-    This fixture runs before all tests and sets MOCK_ANSARI_CLIENT environment variable.
-    We need to set the env var and clear the settings cache to ensure the new value is used.
+    This fixture runs before all tests and checks the MOCK_ANSARI_CLIENT setting.
+    If MOCK_ANSARI_CLIENT is True, tests will use a mock client.
+    If MOCK_ANSARI_CLIENT is False, tests will check backend availability.
+
+    If backend is not available and mock mode is disabled, tests will terminate
+    with clear instructions on how to fix the issue.
 
     The original value (if any) is restored after tests complete.
     """
-    # Store the original value if it exists
-    original_value = os.environ.get("MOCK_ANSARI_CLIENT")
-    had_original_value = "MOCK_ANSARI_CLIENT" in os.environ
+    # Get settings first to check current configuration
+    settings = get_settings()
 
-    backend_available = check_backend_availability()
-
-    if backend_available:
-        logger.info("Backend is AVAILABLE - Tests will use REAL backend")
-        os.environ["MOCK_ANSARI_CLIENT"] = "False"
+    # Log the current mock mode setting
+    if settings.MOCK_ANSARI_CLIENT:
+        logger.info("MOCK_ANSARI_CLIENT is True - Tests will use MOCK client")
+        logger.info("Backend availability check will be skipped")
     else:
-        logger.info("Backend is NOT available - Tests will use MOCK client")
-        os.environ["MOCK_ANSARI_CLIENT"] = "True"
+        logger.info("MOCK_ANSARI_CLIENT is False - Tests will use REAL backend")
+        logger.info("Checking backend availability...")
 
-    # Clear the settings cache to pick up the new MOCK_ANSARI_CLIENT value
-    get_settings.cache_clear()
+        # Check if backend is available
+        backend_available = check_backend_availability()
+
+        if not backend_available:
+            error_message = f"""
+{'=' * 80}
+BACKEND IS NOT AVAILABLE
+{'=' * 80}
+
+The backend server is not reachable, but MOCK_ANSARI_CLIENT is set to False.
+
+To fix this issue, you have the following options:
+
+Option 1: Enable mock mode
+  Set MOCK_ANSARI_CLIENT=True (e.g., in your .env file, GitHub Actions, etc.)
+  This will run tests with a mock client (no backend needed)
+
+Option 2: Fix the backend URL
+  Current BACKEND_SERVER_URL: {settings.BACKEND_SERVER_URL}
+  Ensure the BACKEND_SERVER_URL is correct
+
+Option 3: Start the backend server
+  If BACKEND_SERVER_URL is correct, ensure the ansari-backend
+  service is running on {settings.BACKEND_SERVER_URL}
+
+{'=' * 80}
+"""
+            logger.error(error_message)
+            pytest.exit("Backend not available and MOCK_ANSARI_CLIENT=False. See error message above for solutions.", returncode=1)
 
     # Log the effective configuration
-    settings = get_settings()
-    logger.info(f"MOCK_ANSARI_CLIENT is now set to: {settings.MOCK_ANSARI_CLIENT}")
+    logger.info(f"Test configuration: MOCK_ANSARI_CLIENT = {settings.MOCK_ANSARI_CLIENT}")
+    logger.info(f"Backend URL: {settings.BACKEND_SERVER_URL}")
 
     yield
 
-    # Cleanup: restore original state
-    if had_original_value:
-        # Restore the original value
-        os.environ["MOCK_ANSARI_CLIENT"] = original_value
-        logger.debug(f"Restored MOCK_ANSARI_CLIENT to original value: {original_value}")
-    else:
-        # Delete the key if it didn't exist before
-        if "MOCK_ANSARI_CLIENT" in os.environ:
-            del os.environ["MOCK_ANSARI_CLIENT"]
-        logger.debug("Removed MOCK_ANSARI_CLIENT (it didn't exist before tests)")
-
-    get_settings.cache_clear()
-
+    # No teardown actions needed for this fixture
 
 @pytest.fixture(scope="module")
 def settings():
@@ -177,73 +203,108 @@ def test_webhook_message_basic(settings):
     """Test basic WhatsApp webhook message processing using TestClient.
 
     With mock client enabled, this test should always succeed with 200 status.
+
+    This test requires proper environment variables to be set that simulate
+    a real WhatsApp message. If you encounter errors, verify:
+    - META_BUSINESS_PHONE_NUMBER_ID is set
+    - WHATSAPP_DEV_PHONE_NUM is set
+    - WHATSAPP_DEV_MESSAGE_ID is set
+
+    See .env.example for details on required environment variables.
     """
     test_name = "Basic Webhook Message"
 
-    # Create a minimal WhatsApp webhook payload
-    payload = {
-        "object": "whatsapp_business_account",
-        "entry": [
-            {
-                "changes": [
-                    {
-                        "value": {
-                            "metadata": {
-                                "phone_number_id": settings.META_BUSINESS_PHONE_NUMBER_ID.get_secret_value(),
+    try:
+        # Create a minimal WhatsApp webhook payload
+        payload = {
+            "object": "whatsapp_business_account",
+            "entry": [
+                {
+                    "changes": [
+                        {
+                            "value": {
+                                "metadata": {
+                                    "phone_number_id": settings.META_BUSINESS_PHONE_NUMBER_ID.get_secret_value(),
                                 "display_phone_number": "+1234567890"
-                            },
-                            "messages": [
-                                {
-                                    "from": settings.WHATSAPP_DEV_PHONE_NUM.get_secret_value(),
-                                    "id": settings.WHATSAPP_DEV_MESSAGE_ID.get_secret_value(),
-                                    "timestamp": str(int(time.time())),
-                                    "type": "text",
-                                    "text": {
-                                        "body": "Hello, this is a test message for integration testing"
+                                },
+                                "messages": [
+                                    {
+                                        "from": settings.WHATSAPP_DEV_PHONE_NUM.get_secret_value(),
+                                        "id": settings.WHATSAPP_DEV_MESSAGE_ID.get_secret_value(),
+                                        "timestamp": str(int(time.time())),
+                                        "type": "text",
+                                        "text": {
+                                            "body": "Hello, this is a test message for integration testing"
+                                        }
                                     }
-                                }
-                            ]
+                                ]
+                            }
                         }
-                    }
-                ]
-            }
-        ]
-    }
+                    ]
+                }
+            ]
+        }
 
-    logger.debug(f"[TEST] Testing {test_name}...")
-    logger.debug("   URL: /whatsapp/v2")
-    logger.debug(f"   Payload: {format_payload_for_logging(payload)}")
-    logger.debug(f"   Mock mode: {settings.MOCK_ANSARI_CLIENT}")
+        logger.debug(f"[TEST] Testing {test_name}...")
+        logger.debug("   URL: /whatsapp/v2")
+        logger.debug(f"   Payload: {format_payload_for_logging(payload)}")
+        logger.debug(f"   Mock mode: {settings.MOCK_ANSARI_CLIENT}")
 
-    response = client.post("/whatsapp/v2", json=payload)
+        response = client.post("/whatsapp/v2", json=payload)
 
-    # With mock client, we should always get 200
-    if response.status_code == 200:
-        try:
-            response_data = response.json()
-            success = response_data.get("success", False)
-            message = response_data.get("message", "")
+        # With mock client, we should always get 200
+        if response.status_code == 200:
+            try:
+                response_data = response.json()
+                success = response_data.get("success", False)
+                message = response_data.get("message", "")
 
-            if success and "processed successfully" in message.lower():
-                log_test_result_to_list(test_name, True, "Webhook message processed successfully", response_data)
-                logger.debug("   [PASS] Message processed successfully")
-            else:
-                log_test_result_to_list(test_name, True, "Webhook message accepted", response_data)
-                logger.debug("   [PASS] Message accepted")
+                if success and "processed successfully" in message.lower():
+                    log_test_result_to_list(test_name, True, "Webhook message processed successfully", response_data)
+                    logger.debug("   [PASS] Message processed successfully")
+                else:
+                    log_test_result_to_list(test_name, True, "Webhook message accepted", response_data)
+                    logger.debug("   [PASS] Message accepted")
 
-            assert True
-        except json.JSONDecodeError:
-            log_test_result_to_list(test_name, True, "Webhook message accepted", {"status_code": response.status_code})
-            assert True
-    else:
-        # Non-200 status codes are now considered failures since mock client should handle everything
-        response_data = None
-        try:
-            response_data = response.json()
-        except Exception:
-            response_data = response.text
-        log_test_result_to_list(test_name, False, f"Expected 200, got {response.status_code}.", response_data)
-        assert False, f"Expected HTTP 200 with mock client, got {response.status_code}"
+                assert True
+            except json.JSONDecodeError:
+                log_test_result_to_list(test_name, True, "Webhook message accepted", {"status_code": response.status_code})
+                assert True
+        else:
+            # Non-200 status codes are now considered failures since mock client should handle everything
+            response_data = None
+            try:
+                response_data = response.json()
+            except Exception:
+                response_data = response.text
+            log_test_result_to_list(test_name, False, f"Expected 200, got {response.status_code}.", response_data)
+            assert False, f"Expected HTTP 200 with mock client, got {response.status_code}"
+
+    except (AttributeError, KeyError, TypeError) as e:
+        error_message = f"""
+{'=' * 80}
+ERROR CREATING TEST PAYLOAD
+{'=' * 80}
+
+Failed to create test payload: {str(e)}
+
+This usually means required environment variables are not set.
+These variables must simulate a real WhatsApp message.
+
+Required environment variables:
+  - META_BUSINESS_PHONE_NUMBER_ID: Your Meta business phone number ID
+  - WHATSAPP_DEV_PHONE_NUM: A valid WhatsApp phone number for testing
+  - WHATSAPP_DEV_MESSAGE_ID: A valid message ID for testing
+
+Please check your .env file and ensure all required variables are set.
+See .env.example for the complete list of required environment variables
+and examples of valid values.
+
+{'=' * 80}
+"""
+        logger.error(error_message)
+        log_test_result_to_list(test_name, False, f"Environment variables not properly configured: {str(e)}", None)
+        pytest.fail(f"Test setup failed due to missing environment variables. See error message above. Error: {str(e)}")
 
 
 @pytest.fixture(scope="session", autouse=True)

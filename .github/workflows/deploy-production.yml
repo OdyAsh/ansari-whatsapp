@@ -52,26 +52,24 @@ jobs:
         uses: awslabs/amazon-app-runner-deploy@main
         env:
           # Backend Integration
-          BACKEND_SERVER_URL: ${{ format('{0}{1}', secrets.SSM_ROOT_PRODUCTION, 'backend-server-url') }}
-          DEPLOYMENT_TYPE: ${{ format('{0}{1}', secrets.SSM_ROOT_PRODUCTION, 'deployment-type') }}
+          BACKEND_SERVER_URL: ${{ format('{0}{1}', vars.SSM_ROOT, 'backend-server-url') }}
+          DEPLOYMENT_TYPE: ${{ format('{0}{1}', vars.SSM_ROOT, 'deployment-type') }}
 
           # Meta/WhatsApp Credentials
-          META_ACCESS_TOKEN_FROM_SYS_USER: ${{ format('{0}{1}', secrets.SSM_ROOT_PRODUCTION, 'meta-access-token-from-sys-user') }}
-          META_BUSINESS_PHONE_NUMBER_ID: ${{ format('{0}{1}', secrets.SSM_ROOT_PRODUCTION, 'meta-business-phone-number-id') }}
-          META_WEBHOOK_VERIFY_TOKEN: ${{ format('{0}{1}', secrets.SSM_ROOT_PRODUCTION, 'meta-webhook-verify-token') }}
-          META_API_VERSION: ${{ format('{0}{1}', secrets.SSM_ROOT_PRODUCTION, 'meta-api-version') }}
+          META_ACCESS_TOKEN_FROM_SYS_USER: ${{ format('{0}{1}', vars.SSM_ROOT, 'meta-access-token-from-sys-user') }}
+          META_BUSINESS_PHONE_NUMBER_ID: ${{ format('{0}{1}', vars.SSM_ROOT, 'meta-business-phone-number-id') }}
+          META_WEBHOOK_VERIFY_TOKEN: ${{ format('{0}{1}', vars.SSM_ROOT, 'meta-webhook-verify-token') }}
+          META_API_VERSION: ${{ format('{0}{1}', vars.SSM_ROOT, 'meta-api-version') }}
 
           # Application Settings
-          HOST: ${{ format('{0}{1}', secrets.SSM_ROOT_PRODUCTION, 'host') }}
-          PORT: ${{ format('{0}{1}', secrets.SSM_ROOT_PRODUCTION, 'port') }}
-          WHATSAPP_CHAT_RETENTION_HOURS: ${{ format('{0}{1}', secrets.SSM_ROOT_PRODUCTION, 'whatsapp-chat-retention-hours') }}
-          WHATSAPP_MESSAGE_AGE_THRESHOLD_SECONDS: ${{ format('{0}{1}', secrets.SSM_ROOT_PRODUCTION, 'whatsapp-message-age-threshold-seconds') }}
-          WHATSAPP_UNDER_MAINTENANCE: ${{ format('{0}{1}', secrets.SSM_ROOT_PRODUCTION, 'whatsapp-under-maintenance') }}
+          WHATSAPP_CHAT_RETENTION_HOURS: ${{ format('{0}{1}', vars.SSM_ROOT, 'whatsapp-chat-retention-hours') }}
+          WHATSAPP_MESSAGE_AGE_THRESHOLD_SECONDS: ${{ format('{0}{1}', vars.SSM_ROOT, 'whatsapp-message-age-threshold-seconds') }}
+          WHATSAPP_UNDER_MAINTENANCE: ${{ format('{0}{1}', vars.SSM_ROOT, 'whatsapp-under-maintenance') }}
 
           # Operational Settings
-          ALWAYS_RETURN_OK_TO_META: ${{ format('{0}{1}', secrets.SSM_ROOT_PRODUCTION, 'always-return-ok-to-meta') }}
-          LOGGING_LEVEL: ${{ format('{0}{1}', secrets.SSM_ROOT_PRODUCTION, 'logging-level') }}
-          ORIGINS: ${{ format('{0}{1}', secrets.SSM_ROOT_PRODUCTION, 'origins') }}
+          ALWAYS_RETURN_OK_TO_META: ${{ format('{0}{1}', vars.SSM_ROOT, 'always-return-ok-to-meta') }}
+          LOGGING_LEVEL: ${{ format('{0}{1}', vars.SSM_ROOT, 'logging-level') }}
+          ORIGINS: ${{ format('{0}{1}', vars.SSM_ROOT, 'origins') }}
 
         with:
           service: ansari-whatsapp-production
@@ -90,8 +88,6 @@ jobs:
             META_BUSINESS_PHONE_NUMBER_ID
             META_WEBHOOK_VERIFY_TOKEN
             META_API_VERSION
-            HOST
-            PORT
             WHATSAPP_CHAT_RETENTION_HOURS
             WHATSAPP_MESSAGE_AGE_THRESHOLD_SECONDS
             WHATSAPP_UNDER_MAINTENANCE

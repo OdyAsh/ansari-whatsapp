@@ -2,11 +2,34 @@
 
 This guide explains how to configure GitHub Secrets and understand the deployment workflows.
 
-## Table of Contents
-1. [GitHub Secrets Configuration](#github-secrets-configuration)
-2. [Workflow Overview](#workflow-overview)
-3. [How Deployments Work](#how-deployments-work)
-4. [Troubleshooting](#troubleshooting)
+***TOC:***
+
+- [GitHub Actions Setup for ansari-whatsapp](#github-actions-setup-for-ansari-whatsapp)
+  - [GitHub Secrets Configuration](#github-secrets-configuration)
+    - [Where to Add Secrets](#where-to-add-secrets)
+    - [Required Secrets](#required-secrets)
+      - [AWS Credentials (Reuse from ansari-backend)](#aws-credentials-reuse-from-ansari-backend)
+      - [IAM Role ARNs](#iam-role-arns)
+      - [SSM Parameter Store Paths](#ssm-parameter-store-paths)
+  - [Workflow Overview](#workflow-overview)
+    - [1. Staging Deployment (`.github/workflows/deploy-staging.yml`)](#1-staging-deployment-githubworkflowsdeploy-stagingyml)
+    - [2. Production Deployment (`.github/workflows/deploy-production.yml`)](#2-production-deployment-githubworkflowsdeploy-productionyml)
+  - [How Deployments Work](#how-deployments-work)
+    - [The Deployment Pipeline](#the-deployment-pipeline)
+    - [Environment Variable Injection](#environment-variable-injection)
+    - [Docker Image Tagging Strategy](#docker-image-tagging-strategy)
+    - [Deployment Timing](#deployment-timing)
+  - [Workflow File Structure](#workflow-file-structure)
+    - [Staging Workflow Highlights](#staging-workflow-highlights)
+    - [Key Workflow Parameters](#key-workflow-parameters)
+  - [Manual Deployment Trigger](#manual-deployment-trigger)
+    - [From GitHub UI](#from-github-ui)
+    - [Use Cases for Manual Triggers](#use-cases-for-manual-triggers)
+  - [Monitoring Deployments](#monitoring-deployments)
+    - [GitHub Actions UI](#github-actions-ui)
+    - [AWS Console](#aws-console)
+    - [CloudWatch Logs](#cloudwatch-logs)
+
 
 ---
 
@@ -45,21 +68,14 @@ GitHub Secrets store sensitive credentials that the CI/CD workflows use to deplo
 
 #### SSM Parameter Store Paths
 
-| Secret Name | Value | Description |
-|-------------|-------|-------------|
-| `SSM_ROOT_STAGING` | `/app-runtime/ansari-whatsapp/staging/` | Path prefix for staging environment variables |
-| `SSM_ROOT_PRODUCTION` | `/app-runtime/ansari-whatsapp/production/` | Path prefix for production environment variables |
+| Secret Name | GitHub Environment | Value | Description |
+|-------------|-------------------|-------|-------------|
+| `SSM_ROOT` | `gh-actions-staging-env` | `/app-runtime/ansari-whatsapp/staging/` | Path prefix for staging environment variables |
+| `SSM_ROOT` | `gh-actions-production-env` | `/app-runtime/ansari-whatsapp/production/` | Path prefix for production environment variables |
 
 **Important:** Include the trailing slash!
 
-#### Optional: Environment-Specific Overrides
-
-These are optional and mainly for testing different configurations:
-
-| Secret Name | Default | When to Override |
-|-------------|---------|------------------|
-| `LOGGING_LEVEL_STAGING` | `INFO` | To enable DEBUG logging in staging |
-| `LOGGING_LEVEL_PRODUCTION` | `INFO` | Generally keep at INFO or WARNING |
+**Note:** The same secret `SSM_ROOT` is used, but the value differs based on the GitHub Actions environment (`gh-actions-staging-env` or `gh-actions-production-env`). Set the appropriate value for each environment in GitHub repository settings.
 
 ---
 
@@ -138,11 +154,11 @@ The workflows use a clever pattern to inject environment variables from SSM:
 
 ```yaml
 env:
-  BACKEND_SERVER_URL: ${{ format('{0}{1}', secrets.SSM_ROOT_STAGING, 'backend-server-url') }}
+  BACKEND_SERVER_URL: ${{ format('{0}{1}', secrets.SSM_ROOT, 'backend-server-url') }}
 ```
 
 This concatenates:
-- `SSM_ROOT_STAGING` = `/app-runtime/ansari-whatsapp/staging/`
+- `SSM_ROOT` = `/app-runtime/ansari-whatsapp/staging/` (if we're in the staging environment)
 - `'backend-server-url'` = parameter name
 
 Result: `/app-runtime/ansari-whatsapp/staging/backend-server-url`
@@ -288,127 +304,3 @@ You can manually trigger deployments without pushing code:
 - `/aws/apprunner/ansari-whatsapp-staging/service`
 - `/aws/apprunner/ansari-whatsapp-production/service`
 
----
-
-## Troubleshooting
-
-### Issue: "Repository does not exist or no pull access"
-
-**Cause:** GitHub Actions can't access ECR repository
-
-**Fix:**
-1. Verify ECR repository `ansari-whatsapp` exists:
-   ```bash
-   aws ecr describe-repositories --repository-names ansari-whatsapp \
-     --profile ansari --region us-west-2
-   ```
-2. Check `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` secrets are correct
-3. Verify IAM user has ECR push permissions
-
-### Issue: "Parameter not found"
-
-**Cause:** SSM parameter doesn't exist or path is wrong
-
-**Fix:**
-1. Check `SSM_ROOT_STAGING` or `SSM_ROOT_PRODUCTION` secret has trailing slash
-2. Verify parameters exist:
-   ```bash
-   aws ssm get-parameters-by-path \
-     --path "/app-runtime/ansari-whatsapp/staging" \
-     --profile ansari --region us-west-2
-   ```
-3. Create missing parameters using commands in [aws-cli.md](./aws-cli.md)
-
-### Issue: "Service failed to start"
-
-**Cause:** App Runner can't start the container
-
-**Fix:**
-1. Check Dockerfile is correct
-2. Verify `PORT=8001` is set
-3. Check health check endpoint `GET /` returns 200
-4. Review App Runner logs in AWS Console
-
-### Issue: "AccessDenied when calling AssumeRole"
-
-**Cause:** Instance role doesn't have permission to read SSM parameters
-
-**Fix:**
-1. Verify `CustomAppRunnerInstanceRole` has policy attached:
-   ```bash
-   aws iam list-role-policies --role-name CustomAppRunnerInstanceRole \
-     --profile ansari --region us-west-2
-   ```
-2. Check policy allows `ssm:GetParameter*` on `/app-runtime/ansari-whatsapp/*`
-3. See [instance-role-parameters-access.json](./instance-role-parameters-access.json)
-
-### Issue: "No output from deployment"
-
-**Cause:** Workflow completes but doesn't show App Runner URL
-
-**Fix:**
-- This is normal if the service already existed
-- URL doesn't change between deployments
-- Find URL in AWS Console → App Runner → Service Details
-
----
-
-## Best Practices
-
-### Before Deploying
-
-- [ ] All tests pass in CI
-- [ ] Code reviewed and approved
-- [ ] SSM parameters verified
-- [ ] Staging deployed and tested
-- [ ] No hardcoded secrets in code
-
-### After Deploying
-
-- [ ] Health check passes
-- [ ] Check logs for errors
-- [ ] Send test WhatsApp message
-- [ ] Monitor error rates in CloudWatch
-- [ ] Update Meta webhook URL if needed
-
-### Emergency Procedures
-
-**If production is broken:**
-1. Immediately revert the Git commit:
-   ```bash
-   git revert HEAD
-   git push origin main
-   ```
-2. OR manually rollback in AWS Console
-3. OR update Meta webhook to point to staging temporarily
-
-**Communication:**
-- Notify team in Slack/Discord
-- Update status page if applicable
-- Document the incident for post-mortem
-
----
-
-## Next Steps
-
-After configuring secrets:
-
-1. Test staging deployment first:
-   ```bash
-   git checkout develop
-   git commit --allow-empty -m "test: trigger staging deployment"
-   git push origin develop
-   ```
-
-2. Monitor the deployment in GitHub Actions
-
-3. Once successful, test production:
-   ```bash
-   git checkout main
-   git merge develop
-   git push origin main
-   ```
-
-4. Update Meta webhook URL to production App Runner URL
-
-**You're all set! 🚀**

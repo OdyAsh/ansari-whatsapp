@@ -349,12 +349,21 @@ if __name__ == "__main__":
     module_name = module_path.replace(os.sep, ".").replace(".py", "").replace("src.", "", 1) + ":app"
     logger.debug(f"Running FastAPI app with module name: {module_name}")
 
+    if settings.DEPLOYMENT_TYPE == "local":
+        host = "localhost"
+        reload_uvicorn = True
+        reload_includes = [".env"]
+    else:
+        host = "0.0.0.0"
+        reload_uvicorn = False
+        reload_includes = None
+
     # Run the FastAPI app with uvicorn
     uvicorn.run(
         module_name,  # Dynamically constructed module path
-        host=settings.HOST,
-        port=settings.PORT,
-        reload=True,
-        reload_includes=[".env"],  # Watch .env file for changes
-        log_level=get_settings().LOGGING_LEVEL.lower(),
+        host=host,
+        port=8001,
+        reload=reload_uvicorn,
+        reload_includes=reload_includes,
+        log_level=settings.LOGGING_LEVEL.lower(),
     )

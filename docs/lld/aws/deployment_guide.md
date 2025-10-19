@@ -2,14 +2,32 @@
 
 This guide walks you through deploying the ansari-whatsapp microservice to AWS using the same infrastructure pattern as ansari-backend.
 
-## Table of Contents
-1. [Architecture Overview](#architecture-overview)
-2. [AWS Resources](#aws-resources)
-3. [Prerequisites](#prerequisites)
-4. [Deployment Steps](#deployment-steps)
-5. [Environment Configuration](#environment-configuration)
-6. [Validation & Go-Live](#validation--go-live)
-7. [Troubleshooting](#troubleshooting)
+***TOC:***
+
+- [ansari-whatsapp AWS Deployment Guide](#ansari-whatsapp-aws-deployment-guide)
+  - [Architecture Overview](#architecture-overview)
+    - [The Deployment Pipeline](#the-deployment-pipeline)
+    - [Service Architecture](#service-architecture)
+  - [AWS Resources](#aws-resources)
+    - [Resources We'll Reuse from ansari-backend](#resources-well-reuse-from-ansari-backend)
+    - [New Resources We'll Create](#new-resources-well-create)
+    - [Resource Specifications](#resource-specifications)
+  - [Prerequisites](#prerequisites)
+  - [Deployment Steps](#deployment-steps)
+    - [Step 1: Create AWS Resources](#step-1-create-aws-resources)
+    - [Step 2: Configure GitHub Secrets](#step-2-configure-github-secrets)
+    - [Step 3: First Deployment](#step-3-first-deployment)
+    - [Step 4: Update Meta Webhook URL](#step-4-update-meta-webhook-url)
+  - [Environment Configuration](#environment-configuration)
+    - [Environment Variables by Category](#environment-variables-by-category)
+      - [Backend Integration](#backend-integration)
+      - [Meta/WhatsApp Credentials](#metawhatsapp-credentials)
+      - [Application Settings](#application-settings)
+      - [Operational Settings](#operational-settings)
+    - [SSM Parameter Store Structure](#ssm-parameter-store-structure)
+  - [Validation](#validation)
+    - [Pre-Deployment Checklist](#pre-deployment-checklist)
+
 
 ---
 
@@ -166,8 +184,9 @@ Follow the detailed instructions in [github_actions_setup.md](./github_actions_s
 - `AWS_REGION`
 - `SERVICE_ROLE_ARN`
 - `INSTANCE_ROLE_ARN`
-- `SSM_ROOT_STAGING`
-- `SSM_ROOT_PRODUCTION`
+
+**Required Variables:**
+- `SSM_ROOT`
 
 ### Step 3: First Deployment
 
@@ -215,13 +234,13 @@ Once deployed, you need to tell Meta about the new webhook URL:
 
 The ansari-whatsapp service needs these environment variables, all stored in AWS SSM Parameter Store:
 
-#### **Backend Integration**
+#### Backend Integration
 | Variable | Staging Value | Production Value |
 |----------|---------------|------------------|
 | `BACKEND_SERVER_URL` | `https://staging-api.ansari.chat` | `https://api.ansari.chat` |
 | `DEPLOYMENT_TYPE` | `staging` | `production` |
 
-#### **Meta/WhatsApp Credentials**
+#### Meta/WhatsApp Credentials
 | Variable | Description | Where to Get |
 |----------|-------------|--------------|
 | `META_ACCESS_TOKEN_FROM_SYS_USER` | System user access token | Meta Business Dashboard |
@@ -229,16 +248,14 @@ The ansari-whatsapp service needs these environment variables, all stored in AWS
 | `META_WEBHOOK_VERIFY_TOKEN` | Webhook verification token | You generate this (secure random string) |
 | `META_API_VERSION` | WhatsApp API version | Currently `v22.0` |
 
-#### **Application Settings**
+#### Application Settings
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `HOST` | `0.0.0.0` | Bind to all interfaces |
-| `PORT` | `8001` | Service port |
 | `WHATSAPP_CHAT_RETENTION_HOURS` | `3` | How long to keep chat history |
 | `WHATSAPP_MESSAGE_AGE_THRESHOLD_SECONDS` | `86400` | Reject messages older than 24 hours |
 | `WHATSAPP_UNDER_MAINTENANCE` | `False` | Enable maintenance mode |
 
-#### **Operational Settings**
+#### Operational Settings
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `ALWAYS_RETURN_OK_TO_META` | `True` | Always return HTTP 200 to Meta (required!) |
@@ -273,7 +290,7 @@ The ansari-whatsapp service needs these environment variables, all stored in AWS
 
 ---
 
-## Validation & Go-Live
+## Validation
 
 ### Pre-Deployment Checklist
 
@@ -288,174 +305,3 @@ Before deploying to production, verify:
 - [ ] Meta webhook URL updated (staging)
 - [ ] No hardcoded secrets in code
 
-### Post-Deployment Verification
-
-After deployment, test these scenarios:
-
-#### 1. Health Check
-```bash
-curl https://<app-runner-url>/
-# Expected: {"status": "ok"}
-```
-
-#### 2. Webhook Verification (Meta's GET request)
-```bash
-curl "https://<app-runner-url>/whatsapp/v2?hub.mode=subscribe&hub.challenge=test123&hub.verify_token=<your-verify-token>"
-# Expected: test123
-```
-
-#### 3. Send Test WhatsApp Message
-- Send a message to your WhatsApp business number
-- Check App Runner logs for incoming webhook
-- Verify response received in WhatsApp
-
-#### 4. Check Logs in AWS Console
-1. Go to AWS Console → App Runner
-2. Select `ansari-whatsapp-production` service
-3. Click "Logs" tab
-4. Look for recent webhook requests
-
-#### 5. Monitor Error Rates
-- Check CloudWatch metrics for the service
-- Look for 4xx/5xx error rates
-- Verify latency is acceptable (<1s for health checks)
-
-### Rollback Procedures
-
-If something goes wrong after deployment:
-
-**Option 1: Revert Git Commit**
-```bash
-git revert <bad-commit-sha>
-git push origin main
-# This triggers a new deployment with the reverted code
-```
-
-**Option 2: Manual Rollback in AWS Console**
-1. Go to App Runner → ansari-whatsapp-production
-2. Click "Deployments" tab
-3. Find the last working deployment
-4. Click "Rollback to this deployment"
-
-**Option 3: Emergency - Point Meta Back to Staging**
-1. Go to Meta App Dashboard
-2. Update webhook URL to staging URL temporarily
-3. Fix production issue
-4. Redeploy
-5. Point Meta back to production
-
----
-
-## Troubleshooting
-
-### Common Issues
-
-#### Issue: "App Runner service failed to start"
-**Symptoms:** Service shows "Failed" status in AWS Console
-
-**Possible Causes:**
-1. **Port mismatch:** Dockerfile exposes 8001, but App Runner expects different port
-   - **Fix:** Verify `PORT=8001` in environment variables
-2. **Missing environment variables:** Required vars not set in SSM
-   - **Fix:** Check all parameters in SSM Parameter Store
-3. **Health check failing:** App failing to respond to GET /
-   - **Fix:** Check application logs for startup errors
-
-#### Issue: "Could not pull image from ECR"
-**Symptoms:** Deployment fails at image pull step
-
-**Possible Causes:**
-1. **Wrong service role:** App Runner doesn't have ECR access
-   - **Fix:** Verify `CustomAppRunnerServiceRole` is attached
-2. **Image doesn't exist:** Build failed or image not pushed
-   - **Fix:** Check GitHub Actions logs for build errors
-3. **Wrong region:** Looking in wrong ECR registry
-   - **Fix:** Verify region is `us-west-2` in workflow
-
-#### Issue: "Meta webhook returning 401 Unauthorized"
-**Symptoms:** Meta shows webhook verification failed
-
-**Possible Causes:**
-1. **Wrong verify token:** SSM parameter doesn't match Meta config
-   - **Fix:** Verify `META_WEBHOOK_VERIFY_TOKEN` matches Meta dashboard
-2. **Environment variable not loaded:** App Runner didn't inject the var
-   - **Fix:** Check "Configuration" tab in App Runner console
-
-#### Issue: "Messages not reaching ansari-backend"
-**Symptoms:** WhatsApp receives no response, logs show backend errors
-
-**Possible Causes:**
-1. **Wrong backend URL:** Pointing to wrong environment
-   - **Fix:** Verify `BACKEND_SERVER_URL` in SSM
-2. **Backend not running:** ansari-backend service is down
-   - **Fix:** Check ansari-backend App Runner service status
-3. **Network issue:** App Runner can't reach backend
-   - **Fix:** Verify both services in same VPC (if using VPC)
-
-### Debugging Commands
-
-**Check App Runner Service Status:**
-```bash
-aws apprunner list-services --profile ansari --region us-west-2
-aws apprunner describe-service --service-arn <service-arn> --profile ansari --region us-west-2
-```
-
-**Check SSM Parameters:**
-```bash
-aws ssm get-parameters-by-path \
-  --path "/app-runtime/ansari-whatsapp/production" \
-  --with-decryption \
-  --profile ansari --region us-west-2
-```
-
-**Check ECR Images:**
-```bash
-aws ecr list-images --repository-name ansari-whatsapp \
-  --profile ansari --region us-west-2
-```
-
-**View App Runner Logs (CLI):**
-```bash
-aws logs tail /aws/apprunner/ansari-whatsapp-production/service \
-  --follow \
-  --profile ansari --region us-west-2
-```
-
-### Getting Help
-
-If you're stuck:
-1. Check AWS App Runner logs in the Console
-2. Review GitHub Actions workflow logs
-3. Compare with ansari-backend deployment (working reference)
-4. Check Meta Developer Console for webhook errors
-5. Consult the [AWS App Runner Documentation](https://docs.aws.amazon.com/apprunner/)
-
----
-
-## Next Steps
-
-After successful deployment:
-
-1. **Monitor Performance**
-   - Set up CloudWatch alarms for error rates
-   - Monitor response times
-   - Track WhatsApp message volume
-
-2. **Security Hardening**
-   - Rotate access tokens periodically
-   - Review IAM policies for least privilege
-   - Enable AWS CloudTrail for audit logging
-
-3. **Optimization**
-   - Adjust auto-scaling settings based on traffic
-   - Optimize Docker image size
-   - Consider VPC integration for better security
-
-4. **Documentation**
-   - Document any environment-specific quirks
-   - Update runbooks for on-call engineers
-   - Create dashboards for monitoring
-
----
-
-**Congratulations! 🎉 Your ansari-whatsapp service is now running on AWS App Runner!**

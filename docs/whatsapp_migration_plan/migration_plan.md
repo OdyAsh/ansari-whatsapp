@@ -101,8 +101,7 @@ See [aws/aws-cli.md](../aws/aws-cli.md) for detailed creation commands.
 - [ ] `AWS_REGION` = `us-west-2`
 - [ ] `SERVICE_ROLE_ARN` (CustomAppRunnerServiceRole ARN)
 - [ ] `INSTANCE_ROLE_ARN` (CustomAppRunnerInstanceRole ARN)
-- [ ] `SSM_ROOT_STAGING` = `/app-runtime/ansari-whatsapp/staging/`
-- [ ] `SSM_ROOT_PRODUCTION` = `/app-runtime/ansari-whatsapp/production/`
+- [ ] `SSM_ROOT` = `/app-runtime/ansari-whatsapp/staging/` or `/app-runtime/ansari-whatsapp/production/` (based on the environment)
 
 **Deployment Workflows:**
 - ✅ `.github/workflows/deploy-staging.yml` - Auto-deploy on push to `develop`
@@ -139,7 +138,7 @@ Service goes live! 🚀
 |----------|-----------|------------------|
 | **Backend Integration** | `BACKEND_SERVER_URL`, `DEPLOYMENT_TYPE` | SSM Parameter Store |
 | **WhatsApp Credentials** | `META_ACCESS_TOKEN_FROM_SYS_USER`, `META_BUSINESS_PHONE_NUMBER_ID`, `META_WEBHOOK_VERIFY_TOKEN`, `META_API_VERSION` | SSM Parameter Store |
-| **Application Settings** | `HOST`, `PORT`, `WHATSAPP_CHAT_RETENTION_HOURS`, `WHATSAPP_MESSAGE_AGE_THRESHOLD_SECONDS` | SSM Parameter Store |
+| **Application Settings** | `WHATSAPP_CHAT_RETENTION_HOURS`, `WHATSAPP_MESSAGE_AGE_THRESHOLD_SECONDS` | SSM Parameter Store |
 | **Operational** | `ALWAYS_RETURN_OK_TO_META`, `LOGGING_LEVEL`, `ORIGINS` | SSM Parameter Store |
 
 **SSM Parameter Store Structure:**

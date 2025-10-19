@@ -74,11 +74,7 @@ class WhatsAppSettings(BaseSettings):
 
     # Meta webhook response behavior
     ALWAYS_RETURN_OK_TO_META: bool = True
-
-    # Server settings
-    HOST: str = "localhost"
-    PORT: int = 8001
-
+    
     # CORS settings
     # NOTE: We usually don't need to set this, as the add_extra_origins validator
     #   will automatically add BACKEND_SERVER_URL and other origins as needed.
@@ -122,7 +118,7 @@ class WhatsAppSettings(BaseSettings):
 
         Adds:
         1. In local mode: adds localhost and zrok origins
-        2. In all environments: adds GitHub Actions testserver origin
+        2. In all environments: adds GitHub Actions testserver origin and WhatsApp Web
         """
         origins = v.copy()
 
@@ -147,6 +143,10 @@ class WhatsAppSettings(BaseSettings):
         # Make sure CI/CD of GitHub Actions is allowed in all environments
         if "testserver" not in origins:
             origins.append("testserver")
+
+        # Always allow WhatsApp Web origin
+        if "https://web.whatsapp.com" not in origins:
+            origins.append("https://web.whatsapp.com")
 
         return origins
 

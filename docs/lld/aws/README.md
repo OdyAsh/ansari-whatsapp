@@ -75,11 +75,6 @@ Running Service (with SSM secrets injected)
 - [ ] Update Meta webhook URL
 - [ ] Test production service
 
-## 🔗 Related Documentation
-
-- Main Migration Plan: [../docs/whatsapp_migration_plan/migration_plan.md](../whatsapp_migration_plan/migration_plan.md)
-- Project Documentation: [../docs/CLAUDE.md](../CLAUDE.md)
-- Environment Variables: [../.env.example](../../.env.example)
 
 ## 💡 Key Resources
 
@@ -93,14 +88,6 @@ Running Service (with SSM secrets injected)
 - `CustomAppRunnerServiceRole` - ECR access
 - `CustomAppRunnerInstanceRole` - SSM access
 - `app-runner-github-actions-user` - CI/CD credentials
-
-## ❓ Getting Help
-
-If you encounter issues:
-1. Check the Troubleshooting section in [deployment_guide.md](./deployment_guide.md)
-2. Review GitHub Actions logs for build errors
-3. Check AWS App Runner logs in CloudWatch
-4. Compare with ansari-backend deployment (working reference)
 
 ---
 

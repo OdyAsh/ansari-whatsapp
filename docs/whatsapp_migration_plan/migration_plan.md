@@ -54,27 +54,165 @@ The ansari-whatsapp service communicates with these backend endpoints:
 - ✅ Remove legacy WhatsApp environment variables from backend config (were unused)
 - ✅ Update documentation to reflect separation
 
-### Phase 3: Complete ansari-whatsapp Implementation
-- Test all endpoints thoroughly with both services running
-- Update environment variable configuration
+### ✅ Phase 3: Complete ansari-whatsapp Implementation (COMPLETED)
+- ✅ Test all endpoints thoroughly with both services running
+- ✅ Update environment variable configuration
+- ✅ Implement mock clients for testing without external dependencies
+- ✅ CI/CD testing workflow configured (pytests-staging-app.yml)
+- ✅ All integration tests passing
 
-### Phase 4: Deployment & Testing
-- Update CI/CD for independent deployment of both services
-- Validate proper separation of concerns and no shared resources
+### Phase 4: AWS Deployment & Production Release
+
+This phase covers deploying ansari-whatsapp to AWS App Runner using the same infrastructure pattern as ansari-backend.
+
+**📚 Detailed Documentation:**
+- **[Complete Deployment Guide](../aws/deployment_guide.md)** - Step-by-step walkthrough with architecture overview, troubleshooting, and validation procedures
+- **[AWS CLI Commands](../aws/aws-cli.md)** - All commands to create ECR repositories, SSM parameters, and verify resources
+- **[GitHub Actions Setup](../aws/github_actions_setup.md)** - GitHub Secrets configuration and workflow explanations
+
+#### 4.1 AWS Resources Setup
+
+**Resources We'll Reuse:**
+- ✅ `CustomAppRunnerServiceRole` - Allows App Runner to pull Docker images from ECR
+- ✅ `CustomAppRunnerInstanceRole` - Allows containers to read SSM Parameter Store
+- ✅ `app-runner-github-actions-user` - GitHub Actions AWS credentials
+
+**New Resources to Create:**
+- [ ] ECR Repository: `ansari-whatsapp`
+- [ ] SSM Parameters: `/app-runtime/ansari-whatsapp/staging/*`
+- [ ] SSM Parameters: `/app-runtime/ansari-whatsapp/production/*`
+- [ ] App Runner Service: `ansari-whatsapp-staging`
+- [ ] App Runner Service: `ansari-whatsapp-production`
+
+**Specifications:**
+- Region: `us-west-2` (Oregon)
+- CPU: 1 vCPU
+- Memory: 2 GB
+- Port: 8001
+- Health Check: `GET /`
+
+See [aws/aws-cli.md](../aws/aws-cli.md) for detailed creation commands.
+
+#### 4.2 GitHub Configuration
+
+**Secrets to Add** (see [github_actions_setup.md](../aws/github_actions_setup.md)):
+- [ ] `AWS_ACCESS_KEY_ID` (reuse from ansari-backend)
+- [ ] `AWS_SECRET_ACCESS_KEY` (reuse from ansari-backend)
+- [ ] `AWS_REGION` = `us-west-2`
+- [ ] `SERVICE_ROLE_ARN` (CustomAppRunnerServiceRole ARN)
+- [ ] `INSTANCE_ROLE_ARN` (CustomAppRunnerInstanceRole ARN)
+- [ ] `SSM_ROOT_STAGING` = `/app-runtime/ansari-whatsapp/staging/`
+- [ ] `SSM_ROOT_PRODUCTION` = `/app-runtime/ansari-whatsapp/production/`
+
+**Deployment Workflows:**
+- ✅ `.github/workflows/deploy-staging.yml` - Auto-deploy on push to `develop`
+- ✅ `.github/workflows/deploy-production.yml` - Auto-deploy on push to `main`
+
+#### 4.3 Code & Configuration
+
+**Completed:**
+- ✅ Dockerfile updated to use `uv` (multi-stage build for efficiency)
+- ✅ Environment variables mapped for staging vs production
+- ✅ Health check endpoint implemented (`GET /`)
+- ✅ CORS origins auto-configured per environment
+
+**Deployment Pipeline:**
+```
+Push to GitHub (develop/main)
+    ↓
+GitHub Actions builds Docker image
+    ↓
+Push to Amazon ECR
+    ↓
+Deploy to AWS App Runner
+    ↓
+Load secrets from SSM Parameter Store
+    ↓
+Service goes live! 🚀
+```
+
+#### 4.4 Environment Variables Configuration
+
+**Key Variables by Category:**
+
+| Category | Variables | Storage Location |
+|----------|-----------|------------------|
+| **Backend Integration** | `BACKEND_SERVER_URL`, `DEPLOYMENT_TYPE` | SSM Parameter Store |
+| **WhatsApp Credentials** | `META_ACCESS_TOKEN_FROM_SYS_USER`, `META_BUSINESS_PHONE_NUMBER_ID`, `META_WEBHOOK_VERIFY_TOKEN`, `META_API_VERSION` | SSM Parameter Store |
+| **Application Settings** | `HOST`, `PORT`, `WHATSAPP_CHAT_RETENTION_HOURS`, `WHATSAPP_MESSAGE_AGE_THRESHOLD_SECONDS` | SSM Parameter Store |
+| **Operational** | `ALWAYS_RETURN_OK_TO_META`, `LOGGING_LEVEL`, `ORIGINS` | SSM Parameter Store |
+
+**SSM Parameter Store Structure:**
+```
+/app-runtime/ansari-whatsapp/
+├── staging/
+│   ├── backend-server-url
+│   ├── meta-access-token-from-sys-user
+│   ├── meta-business-phone-number-id
+│   └── ... (all environment variables)
+└── production/
+    ├── backend-server-url
+    ├── meta-access-token-from-sys-user
+    ├── meta-business-phone-number-id
+    └── ... (all environment variables)
+```
+
+See [aws/aws-cli.md](../aws/aws-cli.md) for complete parameter list and creation commands.
+
+#### 4.5 Deployment Validation & Go-Live
+
+**Pre-Deployment Checklist:**
+- [ ] All SSM parameters created and verified
+- [ ] GitHub secrets configured
+- [ ] IAM role ARNs obtained
+- [ ] ECR repository created
+- [ ] Dockerfile builds successfully locally
+- [ ] All tests passing
+
+**Deployment Steps:**
+1. [ ] Create AWS resources (ECR, SSM parameters)
+2. [ ] Configure GitHub Secrets
+3. [ ] Deploy to staging (`git push origin develop`)
+4. [ ] Monitor deployment in GitHub Actions (~8-10 minutes)
+5. [ ] Verify staging health check and logs
+6. [ ] Send test WhatsApp message to staging
+7. [ ] Deploy to production (`git push origin main`)
+8. [ ] Update Meta webhook URL to production App Runner URL
+9. [ ] Send production test message
+10. [ ] Monitor CloudWatch metrics
+
+**Post-Deployment Validation:**
+- [ ] Health check returns `{"status": "ok"}`
+- [ ] Webhook verification works (Meta's GET request)
+- [ ] Test WhatsApp message received and responded
+- [ ] App Runner logs show no errors
+- [ ] Backend communication working (check backend logs)
+
+See [deployment_guide.md](../aws/deployment_guide.md) for detailed validation procedures and troubleshooting.
 
 ## Migration Progress
 
-**Current Status: ~95% Complete**
+**Current Status: Phase 3 Complete ✅ | Phase 4 Ready for Execution 🚀**
 
-✅ Phase 1 & 2 are fully complete! The WhatsApp functionality has been successfully separated:
-- **ansari-whatsapp**: Independent microservice handling WhatsApp webhooks and user interactions
-- **ansari-backend**: Provides API endpoints for ansari-whatsapp to consume (user management, threads, message processing)
+✅ **Phase 1 & 2**: Backend separation complete
+✅ **Phase 3**: ansari-whatsapp implementation and testing complete
+🔄 **Phase 4**: AWS deployment infrastructure prepared, ready for execution
+
+**Architecture Status:**
+- **ansari-whatsapp**: Independent microservice handling WhatsApp webhooks ✅
+- **ansari-backend**: Provides API endpoints for ansari-whatsapp ✅
+- **Deployment Infrastructure**: AWS resources defined, workflows created ✅
+- **Documentation**: Complete deployment guides with troubleshooting ✅
 
 **Recent Improvements:**
 - Removed all location tracking functionality for improved user privacy
 - Both old webhook implementations removed from backend
 - Clean separation of concerns between services
+- Comprehensive AWS deployment documentation created
+- GitHub Actions workflows for staging and production deployment
+- Dockerfile optimized to use uv with multi-stage builds
 
-**Remaining Work:**
-- Phase 3: Thorough end-to-end testing with both services running
-- Phase 4: Update CI/CD pipelines for independent deployment
+**Next Steps:**
+1. Execute Phase 4.1: Create AWS resources (see [aws/aws-cli.md](../aws/aws-cli.md))
+2. Execute Phase 4.2: Configure GitHub Secrets (see [aws/github_actions_setup.md](../aws/github_actions_setup.md))
+3. Execute Phase 4.3-4.5: Deploy and validate (see [aws/deployment_guide.md](../aws/deployment_guide.md))

@@ -9,6 +9,8 @@ on:
     branches: [ "main", "develop" ]
   pull_request:
     branches: [ "main", "develop" ]
+  # Allow other workflows to trigger this workflow
+  workflow_call:
 
 permissions:
   contents: read

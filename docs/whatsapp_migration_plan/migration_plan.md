@@ -58,7 +58,7 @@ The ansari-whatsapp service communicates with these backend endpoints:
 - ✅ Test all endpoints thoroughly with both services running
 - ✅ Update environment variable configuration
 - ✅ Implement mock clients for testing without external dependencies
-- ✅ CI/CD testing workflow configured (pytests-staging-app.yml)
+- ✅ CI/CD testing workflow configured (perform-tests-app.yml)
 - ✅ All integration tests passing
 
 ### Phase 4: AWS Deployment & Production Release

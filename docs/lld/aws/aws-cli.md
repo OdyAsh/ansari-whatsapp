@@ -1,3 +1,32 @@
+
+- [AWS CLI Commands for ansari-whatsapp Deployment](#aws-cli-commands-for-ansari-whatsapp-deployment)
+  - [Prerequisites](#prerequisites)
+  - [1. Create ECR Repository](#1-create-ecr-repository)
+  - [2. Create Staging Environment Variables (SSM Parameters)](#2-create-staging-environment-variables-ssm-parameters)
+    - [Backend Integration](#backend-integration)
+    - [Meta/WhatsApp Credentials](#metawhatsapp-credentials)
+    - [Application Settings](#application-settings)
+    - [Operational Settings](#operational-settings)
+  - [3. Create Production Environment Variables (SSM Parameters)](#3-create-production-environment-variables-ssm-parameters)
+    - [Quick Production Setup](#quick-production-setup)
+  - [4. Verify SSM Parameters](#4-verify-ssm-parameters)
+    - [List All Staging Parameters](#list-all-staging-parameters)
+    - [List All Production Parameters](#list-all-production-parameters)
+    - [View Specific Parameter (with decryption)](#view-specific-parameter-with-decryption)
+  - [5. Update SSM Parameter (if needed)](#5-update-ssm-parameter-if-needed)
+  - [6. Get Existing IAM Role ARNs](#6-get-existing-iam-role-arns)
+    - [Get Service Role ARN](#get-service-role-arn)
+    - [Get Instance Role ARN](#get-instance-role-arn)
+  - [7. Verify IAM Policies (Optional)](#7-verify-iam-policies-optional)
+  - [8. Delete Resources (Cleanup Commands)](#8-delete-resources-cleanup-commands)
+    - [Delete ECR Repository](#delete-ecr-repository)
+    - [Delete SSM Parameters](#delete-ssm-parameters)
+    - [Delete App Runner Service](#delete-app-runner-service)
+  - [Quick Reference](#quick-reference)
+    - [Common Tasks](#common-tasks)
+  - [Notes](#notes)
+
+
 # AWS CLI Commands for ansari-whatsapp Deployment
 
 This file contains all AWS CLI commands needed to set up the infrastructure for ansari-whatsapp.

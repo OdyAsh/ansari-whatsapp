@@ -22,7 +22,7 @@ This guide explains how GitHub Actions CI/CD is configured for the ansari-whatsa
     - [Deleting Secrets \& Variables](#deleting-secrets--variables)
   - [Understanding Workflows in GitHub Actions](#understanding-workflows-in-github-actions)
   - [ansari-whatsapp Workflows](#ansari-whatsapp-workflows)
-  - [Ansari WhatsApp Pytests (python-pytests-staging.yml)](#ansari-whatsapp-pytests-python-pytests-stagingyml)
+  - [Ansari WhatsApp Pytests (perform-tests.yml)](#ansari-whatsapp-pytests-perform-testsyml)
   - [Syntax of Environment Variables in Workflows](#syntax-of-environment-variables-in-workflows)
   - [Artifacts](#artifacts)
   - [Monitoring](#monitoring)
@@ -208,9 +208,9 @@ A GitHub Actions workflow is defined in a YAML file (`.github/workflows/*.yml`) 
 
 ## ansari-whatsapp Workflows
 
-## Ansari WhatsApp Pytests (python-pytests-staging.yml)
+## Ansari WhatsApp Pytests (perform-tests.yml)
 
-**Workflow file:** `.github/workflows/python-pytests-staging.yml`
+**Workflow file:** `.github/workflows/perform-tests.yml`
 
 **Flow diagram:**
 ```

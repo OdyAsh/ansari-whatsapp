@@ -30,6 +30,7 @@ jobs:
       META_WEBHOOK_VERIFY_TOKEN: ${{ secrets.META_WEBHOOK_VERIFY_TOKEN }}
 
       ########### ansari-whatsapp's settings ##########
+      DEPLOYMENT_TYPE: ${{ vars.DEPLOYMENT_TYPE }}
       WHATSAPP_DEV_PHONE_NUM: ${{ secrets.WHATSAPP_DEV_PHONE_NUM}}
       WHATSAPP_DEV_MESSAGE_ID: ${{ secrets.WHATSAPP_DEV_MESSAGE_ID}}
       # If MOCK_META_API is true, then all above META_*/WHATSAPP_* settings are unused during tests  

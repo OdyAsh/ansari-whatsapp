@@ -200,7 +200,7 @@ Key environment variables (see `.env.example`):
 - `META_ACCESS_TOKEN_FROM_SYS_USER` - WhatsApp API access token
 - `META_WEBHOOK_VERIFY_TOKEN` - Webhook verification token
 - `DEPLOYMENT_TYPE` - Environment type (local/staging/production)
-- `WHATSAPP_CHAT_RETENTION_HOURS` - Chat history retention (default: 24)
+- `WHATSAPP_CHAT_RETENTION_HOURS` - Chat history retention (default: 3)
 
 ### Development Notes
 

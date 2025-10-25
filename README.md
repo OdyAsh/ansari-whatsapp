@@ -79,24 +79,40 @@ The service exposes the following endpoints:
 - `GET /whatsapp/v2`: Webhook verification endpoint for WhatsApp
 - `POST /whatsapp/v2`: Main webhook endpoint for receiving WhatsApp messages
 
+## Documentation
+
+### For Newcomers
+1. **Quick Start**: Read this README for setup and basic usage
+2. **Development Guide**: See `CLAUDE.md` for detailed development instructions, testing, and commands
+3. **Architecture Overview**: See `docs/hld/architecture.md` for system design and data flow
+4. **Implementation Details**: See `docs/lld/implementation_guide.md` for technical deep-dive
+
+### For Deployment
+- **AWS Setup**: See `docs/lld/aws/README.md` for complete deployment walkthrough
+- **GitHub Actions**: See `docs/lld/github_actions/README.md` for CI/CD configuration
+
+### For Migration Context
+- **Migration Plan**: See `docs/whatsapp_migration_plan/migration_plan.md` for the 4-phase migration from monolith to microservice
+
 ## Architecture
 
 The service follows a clean architecture pattern:
 
-- `app/`: Contains the FastAPI application and endpoints
-- `presenters/`: Contains the WhatsApp presenter for handling WhatsApp interactions
-- `utils/`: Contains utility modules for logging, configuration, and API client
+- `app/`: FastAPI application with webhook endpoints
+- `services/`: Business logic layer (conversation manager, API clients with mock support)
+- `presenters/`: Message formatting layer (WhatsApp-specific formatting, RTL support)
+- `utils/`: Utility modules (config, logging, parsing, splitting)
 
 ## Integration with Ansari Backend
 
-The WhatsApp service acts as a client to the Ansari backend, making API calls for:
+The WhatsApp service communicates with the Ansari backend via 6 API endpoints:
 
-1. User registration and verification
-2. Creating and managing chat threads
-3. Processing messages and generating responses
-4. Storing user information such as location
-
-The Ansari backend should expose endpoints specifically for WhatsApp integration, which are called by this service.
+1. **POST /whatsapp/v2/users/register** - User registration
+2. **GET /whatsapp/v2/users/exists** - Check user existence
+3. **POST /whatsapp/v2/threads** - Create new threads
+4. **GET /whatsapp/v2/threads/last** - Get last thread info
+5. **GET /whatsapp/v2/threads/{thread_id}/history** - Get thread history
+6. **POST /whatsapp/v2/messages/process** - Process messages (streaming)
 
 ## Environment Variables
 

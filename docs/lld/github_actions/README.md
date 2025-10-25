@@ -13,9 +13,4 @@ This directory contains all documentation for GitHub Actions CI/CD setup in the 
 2. Follow step-by-step commands to replicate the setup
 3. Verify configuration using provided commands
 
-### For Troubleshooting
-1. Check [troubleshooting.md](./troubleshooting.md) for your specific issue
-2. Enable debug logging if needed
-3. Review workflow logs in GitHub Actions tab
-
 ---

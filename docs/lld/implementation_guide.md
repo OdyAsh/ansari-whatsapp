@@ -51,8 +51,9 @@ The codebase is organized following a clean architecture pattern:
 ```mermaid
 graph TD
     subgraph "ansari-whatsapp"
-        APP[app/ - FastAPI Application] --> Presenters
-        Presenters[presenters/ - Business Logic] --> Utils
+        APP[app/ - FastAPI Application] --> Services
+        Services[services/ - Business Logic Layer] --> Presenters
+        Presenters[presenters/ - Formatting Layer] --> Utils
         Utils[utils/ - Helper Modules]
     end
 ```
@@ -69,23 +70,32 @@ graph TD
   - Sends typing indicators to improve user experience
   - Uses FastAPI background tasks for asynchronous message processing
 
-- **src/ansari_whatsapp/presenters/whatsapp_presenter.py**: Core business logic
-  - Extracts details from incoming webhook payloads
-  - Processes different message types (text, location, etc.)
-  - Manages user registration and thread creation/retrieval
-  - Handles message formatting for WhatsApp compatibility (markdown conversion)
-  - Implements smart message splitting strategies for WhatsApp's character limits
-  - Manages error handling with context-specific handlers
-  - Sends messages to users via the WhatsApp API
-  - Implements typing indicators for improved user experience
+- **src/ansari_whatsapp/services/whatsapp_conversation_manager.py**: Message processing orchestration
+  - Orchestrates user registration, thread management, and message processing workflows
+  - Manages typing indicators and chat retention (24 hours default)
+  - Coordinates between Ansari backend and Meta API services
+  - Handles different message types (text, media, location)
+  - Implements error handling with context-specific handlers
 
-- **src/ansari_whatsapp/utils/ansari_client.py**: Backend API client
+- **src/ansari_whatsapp/presenters/whatsapp_message_formatter.py**: Message formatting logic
+  - Formats AI responses for WhatsApp (4K character limit)
+  - Handles markdown to plain text conversion
+  - Implements RTL language support (Arabic, Hebrew)
+  - Smart message splitting at sentence boundaries
+  - Manages response formatting for user-friendly display
+
+- **src/ansari_whatsapp/services/ansari_client_{base,real,mock}.py**: Backend API client
   - Implements API calls to all ansari-backend WhatsApp endpoints
-  - Handles user registration, existence checks, and location updates
-  - Manages thread creation and retrieval
-  - Processes messages through the backend
-  - Features robust error handling with context-specific handlers
-  - Implements customizable error recovery behavior
+  - Handles user registration, existence checks, thread management
+  - Processes messages through the backend with streaming support
+  - Features base/real/mock pattern for testing flexibility
+  - Robust error handling with context-specific handlers
+
+- **src/ansari_whatsapp/services/meta_api_service_{base,real,mock}.py**: WhatsApp Business API client
+  - Sends messages to WhatsApp users via Graph API
+  - Manages typing indicators and read receipts
+  - Supports base/real/mock pattern for testing
+  - Handles WhatsApp API error responses
 
 - **src/ansari_whatsapp/utils/config.py**: Configuration management
   - Defines settings using Pydantic BaseSettings
@@ -94,17 +104,27 @@ graph TD
   - Provides type-safe access to configuration values
   - Implements dynamic CORS origin handling based on deployment type
 
+- **src/ansari_whatsapp/utils/whatsapp_webhook_parser.py**: Webhook payload extraction
+  - Extracts message details from webhook JSON payloads
+  - Supports text messages, locations, and media detection
+  - Robust error handling for malformed webhooks
+
+- **src/ansari_whatsapp/utils/whatsapp_message_splitter.py**: Message splitting logic
+  - Splits long messages at 4K character boundaries
+  - Preserves message coherence and formatting
+  - Smart splitting at sentence boundaries
+
 - **src/ansari_whatsapp/utils/language_utils.py**: Language detection utilities
-  - Detects text language (placeholder for more advanced implementation)
+  - Detects RTL languages (Arabic, Hebrew)
   - Determines text direction (LTR vs RTL) based on character analysis
   - Helps with proper formatting of multilingual messages
 
-- **src/ansari_whatsapp/utils/whatsapp_logger.py**: Logging utilities
+- **src/ansari_whatsapp/utils/app_logger.py**: Logging utilities
   - Configures enhanced logging with rich formatting using loguru
-  - Manages log file handling with dynamic file paths based on module names
+  - Sensitive data masking for tokens and phone numbers
+  - Manages log file handling with rotation and retention
   - Provides standardized logging interface with contextual information
   - Includes rich traceback formatting for improved debugging
-  - Supports different log formats for console and file outputs
 
 #### ansari-backend
 

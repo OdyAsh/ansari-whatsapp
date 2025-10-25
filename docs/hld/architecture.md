@@ -11,7 +11,6 @@
     - [ansari-whatsapp Endpoints](#ansari-whatsapp-endpoints)
     - [ansari-backend WhatsApp API Endpoints](#ansari-backend-whatsapp-api-endpoints)
   - [Data Model](#data-model)
-  - [Future Improvements](#future-improvements)
 
 
 # Ansari WhatsApp Architecture Overview
@@ -38,16 +37,20 @@ graph TD
     end
 
     subgraph "ansari-whatsapp"
-        Webhook[Webhook Endpoints] --> WP[WhatsApp Presenter]
-        WP --> AC[Ansari Client]
+        Webhook[Webhook Endpoints] --> CM[Conversation Manager]
+        CM --> SP[Service Provider]
+        SP --> AC[Ansari Client]
+        SP --> MS[Meta API Service]
+        CM --> WMF[Message Formatter]
     end
 
     subgraph "ansari-backend"
-        API[WhatsApp API Endpoints] --> Agent[Ansari Agent]
+        API[WhatsApp Router<br/>6 API Endpoints] --> Agent[Ansari Agent]
         Agent --> DB[Database]
     end
 
-    AC -- API Calls --> API
+    AC -- REST API --> API
+    MS -- Graph API --> WA
     DB -- Data --> API
 ```
 
@@ -86,19 +89,24 @@ graph TD
 The WhatsApp service is built as a FastAPI application with the following key components:
 
 - **app/main.py**: Entry point for the FastAPI application that handles webhook events from the WhatsApp Business API
-- **presenters/whatsapp_presenter.py**: Core component that processes incoming messages, determines appropriate actions, and formats responses
-- **utils/ansari_client.py**: Client library that communicates with the ansari-backend API endpoints
+- **services/whatsapp_conversation_manager.py**: Orchestrates user registration, thread management, and message processing workflows
+- **presenters/whatsapp_message_formatter.py**: Formats AI responses for WhatsApp (4K limit, markdown conversion, RTL support)
+- **services/ansari_client_{base,real,mock}.py**: Client library that communicates with the ansari-backend API endpoints (with mock support for testing)
+- **services/meta_api_service_{base,real,mock}.py**: WhatsApp Business API client for sending messages and typing indicators
+- **services/service_provider.py**: Dependency injection container for service selection (real vs mock)
 - **utils/config.py**: Configuration management using Pydantic and environment variables
-- **utils/language_utils.py**: Utilities for language detection and text direction determination
-- **utils/whatsapp_logger.py**: Enhanced logging functionality for the service
+- **utils/whatsapp_webhook_parser.py**: Extracts message details from webhook JSON payloads
+- **utils/whatsapp_message_splitter.py**: Splits long messages at WhatsApp's 4K character boundaries
+- **utils/language_utils.py**: Utilities for language detection and text direction determination (RTL support)
+- **utils/app_logger.py**: Enhanced logging functionality with sensitive data masking
 
 ### ansari-backend
 
 The backend service exposes dedicated API endpoints for the WhatsApp service:
 
-- **whatsapp_router.py**: Provides endpoints specifically for WhatsApp service integration
+- **routers/whatsapp_router.py**: Provides 6 API endpoints specifically for WhatsApp service integration
 - **Database Integration**: Handles storage and retrieval of WhatsApp messages, threads, and user data
-- **Ansari Agent**: Processes messages using LLM and generates responses
+- **Ansari Agent**: Processes messages using LLM and generates streaming responses
 
 ## Message Flow
 
@@ -110,29 +118,29 @@ sequenceDiagram
     participant WhatsApp as WhatsApp Business API
     participant WA_Service as ansari-whatsapp
     participant Backend as ansari-backend
-    
+
     User->>WhatsApp: Sends a message
-    WhatsApp->>WA_Service: Webhook event
-    Note over WA_Service: Extract message details
-    
+    WhatsApp->>WA_Service: POST /whatsapp/v2 (webhook)
+    Note over WA_Service: Parse webhook JSON<br/>(whatsapp_webhook_parser)
+
     alt New User
-        WA_Service->>Backend: Register user
+        WA_Service->>Backend: POST /whatsapp/v2/users/register
         Backend->>WA_Service: User registration result
     end
-    
-    alt New Thread or Expired Thread
-        WA_Service->>Backend: Create thread
+
+    alt New Thread or Expired Thread (>24h)
+        WA_Service->>Backend: POST /whatsapp/v2/threads
         Backend->>WA_Service: Thread creation result
     end
-    
+
     WA_Service->>WhatsApp: Send typing indicator "..."
-    WA_Service->>Backend: Process message
-    
+    WA_Service->>Backend: POST /whatsapp/v2/messages/process
+
     Backend->>Backend: Run message through Ansari Agent
-    Backend->>WA_Service: Response
-    
-    Note over WA_Service: Format response for WhatsApp
-    WA_Service->>WhatsApp: Send formatted response
+    Backend->>WA_Service: Streaming response
+
+    Note over WA_Service: Format & split at 4K<br/>(whatsapp_message_formatter)
+    WA_Service->>WhatsApp: Send formatted messages
     WhatsApp->>User: Deliver response
 ```
 
@@ -147,11 +155,10 @@ sequenceDiagram
 
 - **POST /whatsapp/v2/users/register**: Register a new WhatsApp user
 - **GET /whatsapp/v2/users/exists**: Check if a WhatsApp user exists
-- **PUT /whatsapp/v2/users/location**: Update a user's location
 - **POST /whatsapp/v2/threads**: Create a new message thread
 - **GET /whatsapp/v2/threads/last**: Get information about the last active thread
 - **GET /whatsapp/v2/threads/{thread_id}/history**: Get thread message history
-- **POST /whatsapp/v2/messages/process**: Process a message and generate a response
+- **POST /whatsapp/v2/messages/process**: Process a message and generate a streaming response
 
 ## Data Model
 
@@ -184,12 +191,3 @@ erDiagram
         datetime created_at
     }
 ```
-
-## Future Improvements
-
-Potential enhancements to the architecture include:
-
-1. **Message Queue**: Implementing a message queue between the services for better reliability
-2. **Caching (If Applicable/Useful)**: Adding a caching layer to reduce load on the backend
-3. **Multi-instance Support (If Useful)**: Enhancing the architecture to support multiple WhatsApp service instances
-4. **Monitoring & Metrics (If Useful)**: Adding comprehensive monitoring and metrics collection

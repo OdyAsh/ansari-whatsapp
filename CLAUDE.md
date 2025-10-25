@@ -23,9 +23,29 @@ This is the `ansari-whatsapp` microservice that handles WhatsApp webhook request
 - The project uses `.venv` created by `uv`
 - Activation: `.venv/Scripts/python.exe` (Windows) or `.venv/bin/python` (Unix)
 
+### Running the Application
+- **Development mode**:
+  - Use ansari-whatsapp's OWN venv python: `.venv/Scripts/python.exe src/ansari_whatsapp/app/main.py` (Windows) or `.venv/bin/python src/ansari_whatsapp/app/main.py` (Unix)
+  - Alternative: `python -m src.ansari_whatsapp.app.main`
+  - **IMPORTANT:** Use ansari-whatsapp's own .venv, NOT ansari-backend's .venv!
+  - **Testing changes:** ansari-whatsapp boots up quickly, so auto-reload works reliably. You can test immediately after making changes.
+- **Docker**: `docker build -t ansari-whatsapp . && docker run -p 8001:8001 --env-file .env ansari-whatsapp`
+- **WhatsApp Webhook Proxy** (for local testing with Meta):
+  1. In separate terminal, activate environment and cd to ansari-whatsapp root
+  2. Run: `zrok reserve public localhost:8001 -n ZROK_SHARE_TOKEN` (using ZROK_SHARE_TOKEN from .env)
+  3. This creates a public URL that Meta can reach to send webhook requests to your local server
+
+### Code Quality
+- **Linting**: `ruff check .` - Uses Ruff with line length 127, targeting Python 3.10+
+- **Formatting**: `ruff format .` - Auto-formats code with double quotes and 4-space indentation
+- **Fix issues**: `ruff check --fix .` - Auto-fixes linting issues
+
+### Utilities
+- **Clean logs**: `./clean_logs.sh [minutes]` - Removes log entries older than specified minutes (0 = all)
+
 ### Test Framework
 - **Framework:** pytest (not unittest)
-- **Pattern:** Follow backend test patterns (pytest + TestClient + fixtures)
+- **Pattern:** pytest + TestClient + fixtures
 - **Installation:** `uv add pytest`
 - **Run tests:** `pytest tests/ -v`
 - **Logging Modes:**
@@ -63,17 +83,10 @@ $env:ALWAYS_RETURN_OK_TO_META="False"; pytest tests/ -v
 set ALWAYS_RETURN_OK_TO_META=False && pytest tests/ -v
 ```
 
-### Security Requirements
-- **Environment Variables:** Load sensitive data from `.env` file using `get_env_var()`
-- **Logging:** Always mask sensitive content using `mask_sensitive_data()`
-- **No Hardcoded Secrets:** Never put tokens, keys, or phone numbers directly in code
-
 ### Test Structure
 - `tests/test_whatsapp_service.py` - WhatsApp service webhook tests (no external dependencies)
 - `tests/test_utils.py` - Secure logging utilities
 - `pytest.ini` - pytest configuration
-
-**NOTE:** WhatsApp API endpoint tests have been moved to `ansari-backend/tests/unit/test_whatsapp_api_endpoints.py` since they test backend endpoints, not WhatsApp webhook endpoints. This allows them to use TestClient without external server dependencies.
 
 ### Streaming Endpoint Testing
 The `/whatsapp/v2/messages/process` endpoint streams responses. Tests should:
@@ -105,16 +118,98 @@ uv add package-name
 # Run WhatsApp service tests (this repo)
 pytest tests/ -v
 pytest tests/test_whatsapp_service.py -v
-pytest tests/ -m integration -v
-
-# Run WhatsApp API tests (ansari-backend repo)
-cd ../ansari-backend
-pytest tests/unit/test_whatsapp_api_endpoints.py -v
-pytest tests/unit/test_whatsapp_api_endpoints.py -m streaming -v
 
 # Run servers
-.venv/Scripts/python.exe src/ansari_whatsapp/app/main.py
+.venv/Scripts/python.exe src/ansari_whatsapp/app/main.py  # Windows
+.venv/bin/python src/ansari_whatsapp/app/main.py          # Linux/Mac
 ```
+
+## Architecture
+
+### Directory Structure
+```
+src/ansari_whatsapp/
+├── app/                    # FastAPI application and endpoints
+│   └── main.py            # Main FastAPI app with webhook endpoints
+├── services/              # Service layer (business logic)
+│   ├── whatsapp_conversation_manager.py  # Orchestrates workflows
+│   ├── ansari_client_{base,real,mock}.py # Backend API client
+│   ├── meta_api_service_{base,real,mock}.py # WhatsApp API client
+│   └── service_provider.py              # Dependency injection
+├── presenters/            # Presentation layer
+│   └── whatsapp_message_formatter.py    # Message formatting for WhatsApp
+└── utils/                 # Utility modules
+    ├── config.py          # Pydantic settings and configuration
+    ├── whatsapp_webhook_parser.py  # Webhook JSON extraction
+    ├── whatsapp_message_splitter.py # 4K character splitting
+    ├── app_logger.py      # Custom logging with sensitive data masking
+    ├── language_utils.py  # RTL language support
+    ├── time_utils.py      # Timezone handling
+    └── general_helpers.py # CORS middleware and utilities
+```
+
+### Key Components
+
+**FastAPI Application** (`app/main.py`):
+- Health check endpoint: `GET /`
+- Webhook verification: `GET /whatsapp/v2`
+- Message processing: `POST /whatsapp/v2`
+- Uses BackgroundTasks for async message processing to prevent WhatsApp timeouts
+
+**WhatsApp Conversation Manager** (`services/whatsapp_conversation_manager.py`):
+- Orchestrates user registration, thread management, and message processing
+- Manages typing indicators and chat retention (24 hours default)
+- Coordinates between Ansari backend and Meta API services
+
+**WhatsApp Message Formatter** (`presenters/whatsapp_message_formatter.py`):
+- Formats AI responses for WhatsApp (4K character limit)
+- Markdown to plain text conversion
+- RTL language support (Arabic, Hebrew)
+- Smart message splitting at sentence boundaries
+
+**Configuration** (`utils/config.py`):
+- Pydantic Settings with environment variable support
+- Validates deployment type (local/staging/production)
+- Auto-configures CORS origins based on deployment environment
+- Manages WhatsApp API credentials and backend URL
+
+**Service Layer**:
+- **Ansari Client** (`services/ansari_client_*.py`): HTTP client for communicating with the main Ansari backend (base/real/mock)
+- **Meta API Service** (`services/meta_api_service_*.py`): WhatsApp Business API client for sending messages (base/real/mock)
+- **Service Provider** (`services/service_provider.py`): Dependency injection container for service selection
+
+### Integration Points
+
+The service acts as a bridge between WhatsApp Business API and the Ansari backend:
+1. Receives webhooks from WhatsApp at `/whatsapp/v2`
+2. Validates and processes incoming messages
+3. Makes API calls to Ansari backend endpoints:
+   - `/whatsapp/v2/users/register` - User registration
+   - `/whatsapp/v2/users/exists` - Check user existence
+   - `/whatsapp/v2/threads` - Create new threads
+   - `/whatsapp/v2/threads/last` - Get last thread info
+   - `/whatsapp/v2/threads/{thread_id}/history` - Get thread history
+   - `/whatsapp/v2/messages/process` - Process messages (streaming)
+4. Sends responses back to WhatsApp users via Graph API
+
+### Environment Configuration
+
+Key environment variables (see `.env.example`):
+- `BACKEND_SERVER_URL` - URL of the Ansari backend API
+- `META_BUSINESS_PHONE_NUMBER_ID` - WhatsApp Business phone number ID
+- `META_ACCESS_TOKEN_FROM_SYS_USER` - WhatsApp API access token
+- `META_WEBHOOK_VERIFY_TOKEN` - Webhook verification token
+- `DEPLOYMENT_TYPE` - Environment type (local/staging/production)
+- `WHATSAPP_CHAT_RETENTION_HOURS` - Chat history retention (default: 24)
+
+### Development Notes
+
+- Uses Python 3.10+ with modern async/await patterns
+- Implements proper error handling with Loguru decorators
+- CORS middleware automatically includes backend URL and deployment-specific origins
+- Local development uses zrok for webhook tunneling
+- Logging configured with Rich formatting and file rotation
+- Comprehensive test suite with mock clients for CI/CD
 
 ## Recent Changes
 - Refactored all tests to use pytest + TestClient pattern
@@ -124,5 +219,7 @@ pytest tests/unit/test_whatsapp_api_endpoints.py -m streaming -v
 - All security issues resolved (no hardcoded secrets)
 - Added `ALWAYS_RETURN_OK_TO_META` setting for controlling webhook response behavior
 - Added `LOG_TEST_FILES_ONLY` setting for filtering test logs
+- Migrated to service layer architecture (base/real/mock pattern)
+- Added WhatsApp conversation manager for workflow orchestration
 
 **Remember: Always use `uv` for package management in this project!**

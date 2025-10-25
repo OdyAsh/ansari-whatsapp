@@ -1,6 +1,23 @@
 # WhatsApp Migration Plan
 
-Based on my analysis of both repositories, here's what I found and what needs to be completed for the WhatsApp migration:
+- [WhatsApp Migration Plan](#whatsapp-migration-plan)
+  - [Current Migration Status](#current-migration-status)
+    - [✅ What's Already Migrated to ansari-whatsapp:](#-whats-already-migrated-to-ansari-whatsapp)
+    - [✅ Cleaned Up from ansari-backend (Completed):](#-cleaned-up-from-ansari-backend-completed)
+    - [✅ Backend API Endpoints (Completed):](#-backend-api-endpoints-completed)
+    - [🔧 What Needs Enhancement in ansari-whatsapp:](#-what-needs-enhancement-in-ansari-whatsapp)
+  - [Migration Plan](#migration-plan)
+    - [✅ Phase 1: Create Missing Backend API Endpoints (COMPLETED)](#-phase-1-create-missing-backend-api-endpoints-completed)
+    - [✅ Phase 2: Clean Up ansari-backend (COMPLETED)](#-phase-2-clean-up-ansari-backend-completed)
+    - [✅ Phase 3: Complete ansari-whatsapp Implementation (COMPLETED)](#-phase-3-complete-ansari-whatsapp-implementation-completed)
+    - [Phase 4: AWS Deployment \& Production Release](#phase-4-aws-deployment--production-release)
+      - [4.1 AWS Resources Setup](#41-aws-resources-setup)
+      - [4.2 GitHub Configuration](#42-github-configuration)
+      - [4.3 Code \& Configuration](#43-code--configuration)
+      - [4.4 Environment Variables Configuration](#44-environment-variables-configuration)
+      - [4.5 Deployment Validation \& Go-Live](#45-deployment-validation--go-live)
+  - [Migration Progress](#migration-progress)
+
 
 ## Current Migration Status
 

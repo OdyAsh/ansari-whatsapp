@@ -119,9 +119,14 @@ class MetaApiServiceReal(MetaApiServiceBase):
                 for i, part in enumerate(message_parts, 1):
                     json_data = {
                         "messaging_product": "whatsapp",
-                        "to": recipient_phone,
                         "text": {"body": part},
                     }
+                    if recipient_phone.isdigit():
+                        json_data["to"] = recipient_phone
+                    else:
+                        # Not a phone number, so it's a business-scoped user ID (e.g., US.1349...)
+                        json_data["recipient_type"] = "individual"
+                        json_data["recipient"] = recipient_phone
 
                     response = await client.post(
                         self.api_url,

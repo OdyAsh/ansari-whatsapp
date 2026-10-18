@@ -353,6 +353,56 @@ and examples of valid values.
         pytest.fail(f"Test setup failed due to missing environment variables. See error message above. Error: {str(e)}")
 
 
+def _post_signed_webhook(settings, message: dict, contacts: list | None = None):
+    """POST a signed webhook whose messages[0] is `message`."""
+    value = {
+        "metadata": {
+            "phone_number_id": settings.META_BUSINESS_PHONE_NUMBER_ID.get_secret_value(),
+            "display_phone_number": "+1234567890",
+        },
+        "messages": [message],
+    }
+    if contacts is not None:
+        value["contacts"] = contacts
+    payload = {"object": "whatsapp_business_account", "entry": [{"changes": [{"value": value}]}]}
+    body_bytes = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    app_secret = settings.META_ANSARI_APP_SECRET.get_secret_value().encode("utf-8")
+    signature = hmac.new(app_secret, body_bytes, hashlib.sha256).hexdigest()
+    return client.post("/whatsapp/v2", content=body_bytes, headers={"X-Hub-Signature-256": f"sha256={signature}"})
+
+
+@pytest.mark.integration
+def test_webhook_phone_hidden_user(settings):
+    """A BSUID-only sender (no `from`) gets the phone-number notice and is not processed."""
+    message = {
+        "from_user_id": "US.13491208655302741918",
+        "id": "wamid.TEST_PHONE_HIDDEN",
+        "timestamp": str(int(time.time())),
+        "type": "text",
+        "text": {"body": "Assalamu alaikum"},
+    }
+    contacts = [{"profile": {"name": "Test User", "username": "testuser"}, "user_id": "US.13491208655302741918"}]
+
+    response = _post_signed_webhook(settings, message, contacts)
+
+    assert response.json()["error_code"] == "PHONE_HIDDEN_USER"
+
+
+@pytest.mark.integration
+def test_webhook_missing_from_without_bsuid(settings):
+    """A message with neither `from` nor `from_user_id` is reported as an unexpected format."""
+    message = {
+        "id": "wamid.TEST_NO_IDENTIFIER",
+        "timestamp": str(int(time.time())),
+        "type": "text",
+        "text": {"body": "Assalamu alaikum"},
+    }
+
+    response = _post_signed_webhook(settings, message, contacts=[])
+
+    assert response.json()["error_code"] == "UNEXPECTED_PAYLOAD_FORMAT"
+
+
 @pytest.fixture(scope="session", autouse=True)
 def save_results():
     """Save test results to file (runs after all tests in the session)."""

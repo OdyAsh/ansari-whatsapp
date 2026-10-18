@@ -30,6 +30,7 @@ from ansari_whatsapp.utils.whatsapp_webhook_utils import (
 from ansari_whatsapp.utils.app_logger import logger, request_id_var, user_id_var
 from ansari_whatsapp.utils.time_utils import is_message_too_old
 from ansari_whatsapp.utils.config import get_settings
+from ansari_whatsapp.utils.exceptions import PhoneHiddenUserError, UnexpectedMetaPayloadError
 from ansari_whatsapp.utils.general_helpers import CORSMiddlewareWithLogging
 
 
@@ -277,6 +278,44 @@ async def main_webhook(
             )
 
         logger.debug(f"Incoming whatsapp webhook message from {from_whatsapp_number}")
+    except PhoneHiddenUserError as e:
+        logger.warning(f"{e}; sending a notice instead of processing the message")
+        notifier = WhatsAppConversationManager(user_phone_num=e.bsuid)
+        background_tasks.add_task(
+            notifier.send_whatsapp_message,
+            "Apologies, but Ansari is currently running an old implementation which requires you to have "
+            "your phone number sent to it (not just your username), so either adjust your WhatsApp privacy "
+            "settings or wait for our new Ansari release, which will take some time.",
+        )
+        return create_response_for_meta(
+            success=False,
+            message="Sender did not share a phone number",
+            status_code=422,
+            error_code="PHONE_HIDDEN_USER",
+        )
+    except UnexpectedMetaPayloadError as e:
+        logger.error(f"Unexpected Meta payload format: {e}")
+        sentry_sdk.set_tag("error_type", "unexpected_meta_payload")
+        sentry_sdk.set_context("webhook_details", {
+            "request_id": request_id_var.get(),
+        })
+        sentry_sdk.capture_exception(e)
+        if e.reply_to:
+            notifier = WhatsAppConversationManager(user_phone_num=e.reply_to)
+            background_tasks.add_task(
+                notifier.send_whatsapp_message,
+                "It seems Meta sent your message in an unexpected format. This is not a problem in what you wrote, "
+                "so please send this chat as screenshot to the developers to investigate further",
+            )
+        else:
+            logger.error("No phone number or BSUID in the payload, so the user could not be notified")
+        return create_response_for_meta(
+            success=False,
+            message="Unexpected message format received from Meta",
+            status_code=400,
+            error_code="UNEXPECTED_PAYLOAD_FORMAT",
+            details={"error": str(e)}
+        )
     except Exception as e:
         logger.exception(f"Error extracting message details: {e}")
         sentry_sdk.set_tag("error_type", "webhook_processing_failure")

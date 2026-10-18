@@ -97,12 +97,20 @@ class MetaApiServiceReal(MetaApiServiceBase):
         """Send WhatsApp message(s) via Meta API.
 
         Args:
-            recipient_phone: WhatsApp phone number of recipient
+            recipient_phone: WhatsApp phone number of recipient, or a business-scoped user ID (BSUID,
+                e.g., "US.13491208655302741918") if the user's phone number is hidden
             message_parts: List of message parts (already split by length)
 
         Raises:
             httpx.HTTPStatusError: If Meta API returns error status
             httpx.RequestError: If network error occurs
+
+        Note:
+            Per Meta, a phone number goes in `to`, while a BSUID goes in `recipient` (with `to` omitted;
+            if both are sent, `to` takes precedence). Meta's page marks BSUID sending as "coming soon"
+            in one place and as supported from July 2026 in another, and this hasn't been tested against
+            the live API.
+            https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids#send-message-requests
         """
         if not recipient_phone:
             logger.error("Cannot send message: No recipient phone number")
@@ -119,9 +127,14 @@ class MetaApiServiceReal(MetaApiServiceBase):
                 for i, part in enumerate(message_parts, 1):
                     json_data = {
                         "messaging_product": "whatsapp",
-                        "to": recipient_phone,
                         "text": {"body": part},
                     }
+                    if recipient_phone.isdigit():
+                        json_data["to"] = recipient_phone
+                    else:
+                        # Not a phone number, so it's a business-scoped user ID (e.g., US.1349...)
+                        json_data["recipient_type"] = "individual"
+                        json_data["recipient"] = recipient_phone
 
                     response = await client.post(
                         self.api_url,

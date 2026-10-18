@@ -14,6 +14,7 @@ from fastapi import Request, HTTPException
 from fastapi.responses import JSONResponse, Response
 
 from ansari_whatsapp.utils.config import get_settings
+from ansari_whatsapp.utils.exceptions import PhoneHiddenUserError, UnexpectedMetaPayloadError
 
 settings = get_settings()
 
@@ -147,6 +148,22 @@ def create_response_for_meta(
     )
 
 
+# Keys whose string values are safe to log as-is (everything else is masked, e.g., phone numbers, names, text)
+_UNREDACTED_KEYS = {"object", "field", "messaging_product", "type", "id", "timestamp"}
+
+
+def _redact_for_logging(obj, key: str | None = None):
+    """Return obj with its structure intact but string values masked as `<str len=N>`, except for safe keys 
+    (i.e., keys in _UNREDACTED_KEYS)."""
+    if isinstance(obj, dict):
+        return {k: _redact_for_logging(v, k) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_redact_for_logging(v, key) for v in obj]
+    if isinstance(obj, str) and key not in _UNREDACTED_KEYS:
+        return f"<str len={len(obj)}>"
+    return obj
+
+
 async def parse_meta_payload(
     body: dict[str, dict],
 ) -> tuple[bool, bool, str | None, str | None, dict | None, str | None, int | None]:
@@ -205,16 +222,33 @@ async def parse_meta_payload(
 
     incoming_msg = value["messages"][0]
 
-    # Extract message details
-    message_id = incoming_msg.get("id")
-    user_whatsapp_number = incoming_msg["from"]
-    message_unix_time_str = incoming_msg.get("timestamp")
-    message_unix_time = int(message_unix_time_str) if message_unix_time_str is not None else None
+    if "from" not in incoming_msg and incoming_msg.get("from_user_id"):
+        raise PhoneHiddenUserError(incoming_msg["from_user_id"])
 
-    # Meta API note: Meta sends "errors" key when receiving unsupported message types
-    # (e.g., video notes, gifs sent from giphy, or polls)
-    incoming_msg_type = incoming_msg["type"] if incoming_msg["type"] in incoming_msg.keys() else "errors"
-    incoming_msg_body = incoming_msg[incoming_msg_type]
+    try:
+        # Extract message details
+        message_id = incoming_msg.get("id")
+        user_whatsapp_number = incoming_msg["from"]
+        message_unix_time_str = incoming_msg.get("timestamp")
+        message_unix_time = int(message_unix_time_str) if message_unix_time_str is not None else None
+
+        # Meta API note: Meta sends "errors" key when receiving unsupported message types
+        # (e.g., video notes, gifs sent from giphy, or polls)
+        incoming_msg_type = incoming_msg["type"] if incoming_msg["type"] in incoming_msg.keys() else "errors"
+        incoming_msg_body = incoming_msg[incoming_msg_type]
+    except KeyError as e:
+        logger.error(f"Missing key {e} in messages[0]; redacted webhook value: {_redact_for_logging(value)}")
+        contact = (value.get("contacts") or [{}])[0]
+        reply_to = (
+            incoming_msg.get("from")
+            or incoming_msg.get("from_user_id")
+            or contact.get("wa_id")
+            or contact.get("user_id")
+        )
+        raise UnexpectedMetaPayloadError(
+            f"Missing key {e} in messages[0]; keys present: {sorted(incoming_msg.keys())}",
+            reply_to=reply_to,
+        ) from e
 
     logger.info(f"Received a supported whatsapp message from {user_whatsapp_number}: {incoming_msg_body}")
 
